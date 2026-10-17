@@ -1,0 +1,233 @@
+openapi: 3.1.0
+info:
+  title: IncuBrix Long-Tail Distribution Connector Service API
+  version: 1.0.0
+  description: API for syndicating creator content across long-tail platforms, developer blogs, forums, and partner networks.
+servers:
+  - url: http://localhost:3000
+    description: Local Development / Docker Environment
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                  uptime_seconds:
+                    type: number
+
+  /ready:
+    get:
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Service is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  simulation_mode:
+                    type: boolean
+                  version:
+                    type: string
+
+  /api/v1/publish:
+    post:
+      summary: Publish content rendition to a destination with rules check
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: false
+          description: Unique key preventing duplicate executions
+        - in: header
+          name: X-Correlation-Id
+          schema:
+            type: string
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rendition
+              properties:
+                destination_id:
+                  type: string
+                  example: dest_discourse_meta
+                rendition:
+                  type: object
+                  required:
+                    - body
+                  properties:
+                    title:
+                      type: string
+                    body:
+                      type: string
+                    canonical_url:
+                      type: string
+                    media_urls:
+                      type: array
+                      items:
+                        type: string
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                    is_ai_generated:
+                      type: boolean
+                    is_promotional:
+                      type: boolean
+                async:
+                  type: boolean
+                  default: false
+                callback_url:
+                  type: string
+      responses:
+        '200':
+          description: Published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  platform_post_id:
+                    type: string
+                  live_url:
+                    type: string
+                  status:
+                    type: string
+                  manifest:
+                    type: object
+        '202':
+          description: Accepted for asynchronous processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  check_url:
+                    type: string
+        '400':
+          description: Format or specification violation
+        '422':
+          description: Content rejected by community posting rules
+        '429':
+          description: Frequency cap reached or rate limited
+
+  /api/v1/jobs/{job_id}:
+    get:
+      summary: Check background job status and results
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  type:
+                    type: string
+                  status:
+                    type: string
+                    enum: [queued, running, succeeded, failed]
+                  progress:
+                    type: number
+                  result:
+                    type: object
+
+  /api/v1/destinations:
+    get:
+      summary: List all configured catalogue destinations
+      responses:
+        '200':
+          description: Destination list
+    post:
+      summary: Add a new destination via configuration (no code changes needed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - platform_key
+                - connector_key
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                platform_key:
+                  type: string
+                surface:
+                  type: string
+                connector_key:
+                  type: string
+                frequency_cap:
+                  type: string
+                self_promo_allowed:
+                  type: boolean
+                link_policy:
+                  type: string
+                disclosure_required:
+                  type: boolean
+      responses:
+        '201':
+          description: Destination created
+
+  /connector/v1/{connector_key}/{method}:
+    post:
+      summary: Appendix A connector contract invoke method
+      parameters:
+        - in: path
+          name: connector_key
+          required: true
+          schema:
+            type: string
+            enum: [discourse, lemmy, devto, ghost, webhook, assisted]
+        - in: path
+          name: method
+          required: true
+          schema:
+            type: string
+            enum: [validate, publish, get_status, delete, fetch_metrics, refresh_auth, build_assist_pack]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Method execution result

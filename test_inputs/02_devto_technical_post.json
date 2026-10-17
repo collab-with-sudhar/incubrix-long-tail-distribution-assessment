@@ -1,0 +1,11 @@
+{
+  "destination_id": "dest_devto_main",
+  "rendition": {
+    "title": "Scaling Distribution Connectors with Node.js and TypeScript",
+    "body": "A technical deep-dive into building distributed connector engines with safe retries.",
+    "canonical_url": "https://dev.to/incubrix/scaling-connectors",
+    "tags": ["nodejs", "typescript", "architecture"],
+    "is_promotional": false,
+    "is_ai_generated": true
+  }
+}
