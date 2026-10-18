@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # IncuBrix Distribution Connector Service
   incubrix-service:
@@ -66,7 +64,7 @@ services:
 
   # Local S3 Storage (Integration Standard 7)
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: incubrix-minio
     command: server /data --console-address ":9001"
     ports:
