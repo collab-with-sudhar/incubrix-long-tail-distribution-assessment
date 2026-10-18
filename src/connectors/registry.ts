@@ -5,6 +5,9 @@ import { DevtoConnector } from './devto.js';
 import { GhostConnector } from './ghost.js';
 import { WebhookConnector } from './webhook.js';
 import { AssistedConnector } from './assisted.js';
+import { HashnodeConnector } from './hashnode.js';
+import { SlackConnector } from './slack.js';
+import { MRSSConnector } from './mrss.js';
 import { AppError } from '../middleware/errorHandler.js';
 
 export class ConnectorRegistry {
@@ -18,6 +21,9 @@ export class ConnectorRegistry {
     this.register(new GhostConnector());
     this.register(new WebhookConnector());
     this.register(new AssistedConnector());
+    this.register(new HashnodeConnector());
+    this.register(new SlackConnector());
+    this.register(new MRSSConnector());
   }
 
   public register(connector: BaseConnector): void {

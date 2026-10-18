@@ -211,3 +211,107 @@ apiV1Router.post('/certification/run', async (req: Request, res: Response, next:
     next(err);
   }
 });
+
+import { globalCatalogueImporter } from '../catalogue/importer.js';
+import { globalRulesCaptureService } from '../rules/capture.js';
+import { globalContentTailoringService } from '../catalogue/tailoring.js';
+
+/**
+ * POST /api/v1/catalogue/import
+ * Ingest CSV of destinations with validation, de-duplication, reachability check, and enrichment (Advanced)
+ */
+apiV1Router.post('/catalogue/import', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { csv_data, verify_reachability } = req.body;
+    if (!csv_data || typeof csv_data !== 'string') {
+      throw new AppError('DEST_SPEC_VIOLATION', 'Missing or invalid csv_data string', 400);
+    }
+    const result = await globalCatalogueImporter.importFromCsv(csv_data, Boolean(verify_reachability));
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/rules/capture
+ * AI reads community rules page/text and proposes posting rules (Advanced)
+ */
+apiV1Router.post('/rules/capture', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { community_name, rules_text, rules_url, destination_id } = req.body;
+    if (!community_name || !rules_text) {
+      throw new AppError('DEST_SPEC_VIOLATION', 'Missing community_name or rules_text', 400);
+    }
+    const proposal = await globalRulesCaptureService.captureRules(
+      community_name,
+      rules_text,
+      rules_url,
+      destination_id
+    );
+    res.status(200).json(proposal);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/rules/confirm
+ * Human confirms or modifies proposed rules before activation (Advanced)
+ */
+apiV1Router.post('/rules/confirm', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { proposal_id, approved, overrides, reviewer_notes } = req.body;
+    if (!proposal_id || approved === undefined) {
+      throw new AppError('DEST_SPEC_VIOLATION', 'Missing proposal_id or approved boolean flag', 400);
+    }
+    const confirmed = globalRulesCaptureService.confirmRules(
+      proposal_id,
+      Boolean(approved),
+      overrides,
+      reviewer_notes
+    );
+    res.status(200).json(confirmed);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/catalogue/score-relevance
+ * Score destination 1-5 against IncuBrix target audience (Advanced)
+ */
+apiV1Router.post('/catalogue/score-relevance', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const destination = req.body;
+    if (!destination || !destination.name) {
+      throw new AppError('DEST_SPEC_VIOLATION', 'Missing destination object', 400);
+    }
+    const scoreResult = globalContentTailoringService.scoreRelevance(destination);
+    res.status(200).json(scoreResult);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/content/tailor
+ * Adapts title, body, and framing per destination type (Advanced)
+ */
+apiV1Router.post('/content/tailor', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rendition, destination_id, destination: customDestination } = req.body;
+    if (!rendition) {
+      throw new AppError('DEST_SPEC_VIOLATION', 'Missing rendition object', 400);
+    }
+    const destination = (destination_id ? globalCatalogue.get(destination_id) : undefined) || customDestination;
+    if (!destination) {
+      throw new AppError('DEST_SPEC_VIOLATION', `Destination not found for id: ${destination_id}`, 404);
+    }
+    const tailored = globalContentTailoringService.tailor(rendition, destination);
+    res.status(200).json(tailored);
+  } catch (err) {
+    next(err);
+  }
+});
+

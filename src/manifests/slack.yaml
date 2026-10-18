@@ -1,0 +1,29 @@
+key: slack
+version: 1.0.0
+tier: native
+auth: bot_token
+surfaces:
+  - key: message
+    content_types:
+      - text
+      - link
+      - image
+    spec:
+      title_max_chars: 300
+      body_max_chars: 40000
+      links_allowed: true
+rate_limits:
+  per_connection:
+    requests: 60
+    per_seconds: 60
+capabilities:
+  - publish
+  - status
+  - delete
+error_map:
+  "429": PLATFORM_RATE_LIMIT
+  "400": PLATFORM_CONTENT_REJECTED
+  "401": CONNECTION_AUTH_EXPIRED
+  "403": CONNECTION_AUTH_EXPIRED
+  "500": PLATFORM_UNAVAILABLE
+instance_param: channel_id
