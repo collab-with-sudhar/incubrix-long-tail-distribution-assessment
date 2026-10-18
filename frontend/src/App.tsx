@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
+// Interfaces
 interface Destination {
   id: string;
   name: string;
@@ -49,10 +50,13 @@ interface ImportSummary {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'workbench' | 'destinations' | 'lab' | 'importer' | 'certification'>('workbench');
+  const [activeTab, setActiveTab] = useState<'publish' | 'destinations' | 'rules' | 'import' | 'certification'>('publish');
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [healthStatus, setHealthStatus] = useState<string>('Connecting...');
   const [simulationMode, setSimulationMode] = useState<boolean>(true);
+
+  // Filter for Destinations tab
+  const [destFilter, setDestFilter] = useState<string>('');
 
   // Compose State
   const [selectedDestId, setSelectedDestId] = useState<string>('');
@@ -85,10 +89,10 @@ export function App() {
   const [newDestSelfPromo, setNewDestSelfPromo] = useState<boolean>(false);
   const [newDestDisclosure, setNewDestDisclosure] = useState<boolean>(true);
 
-  // Rules Lab State
-  const [communityName, setCommunityName] = useState<string>('Indie Hackers Tech Community');
+  // Rules State
+  const [communityName, setCommunityName] = useState<string>('Developer Guild');
   const [communityRules, setCommunityRules] = useState<string>(
-    `Community Rules:\n1. No self-promotion: Promotional posts and product advertisements are strictly forbidden.\n2. Cadence: Limit all updates to once a week per user.\n3. Transparency: All AI-assisted or generated content must be labeled with an AI disclosure note.\n4. Links: Please keep all reference links in the first comment only.`
+    `Guidelines:\n1. Self-promotion and direct product marketing are prohibited.\n2. Posting cadence is restricted to once per week.\n3. Content generated with AI assistance must include explicit attribution.\n4. Outbound reference links must be placed in the first comment.`
   );
   const [analyzingRules, setAnalyzingRules] = useState<boolean>(false);
   const [proposal, setProposal] = useState<RuleProposal | null>(null);
@@ -111,7 +115,6 @@ export function App() {
   const [certResults, setCertResults] = useState<Record<string, any>>({});
   const [viewingEvidence, setViewingEvidence] = useState<any | null>(null);
 
-  // 1. Initial Load
   useEffect(() => {
     generateIdempKey();
     fetchHealth();
@@ -120,7 +123,7 @@ export function App() {
   }, []);
 
   const generateIdempKey = () => {
-    setIdempKey(`idemp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+    setIdempKey(`req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
   };
 
   const fetchHealth = async () => {
@@ -161,43 +164,42 @@ export function App() {
     }
   };
 
-  // 2. Active Destination Policy Details
   const activeDest = destinations.find((d) => d.id === selectedDestId) || destinations[0];
 
-  // Real-time Rules Pre-Check Advisory
+  // Clean Policy Pre-Check
   const getRuleAdvisory = () => {
-    if (!activeDest) return { type: 'success', text: 'Select a destination to evaluate rules.' };
+    if (!activeDest) return { type: 'clean', text: 'Select a destination to evaluate community policy.' };
 
     if (activeDest.self_promo_allowed === false && isPromotional) {
       return {
-        type: 'error',
-        text: `Rule Violation: ${activeDest.name} strictly forbids self-promotion. If submitted, the rules engine will halt the request with PLATFORM_CONTENT_REJECTED.`
+        type: 'blocked',
+        text: `Promotional content blocked: ${activeDest.name} enforces a strict non-promotional policy.`
       };
     }
 
     if (activeDest.link_policy === 'no_links' && /https?:\/\//i.test(postBody)) {
       return {
-        type: 'error',
-        text: `Link Policy Violation: ${activeDest.name} forbids outbound hyperlinks in the body. Will be blocked with DEST_SPEC_VIOLATION.`
+        type: 'blocked',
+        text: `Hyperlinks blocked: ${activeDest.name} forbids links in the post body.`
       };
     }
 
     if (activeDest.disclosure_required && isAiGenerated) {
       return {
-        type: 'warn',
-        text: `AI Disclosure Notice: ${activeDest.name} requires attribution. The engine will automatically format and append a compliant AI disclosure statement.`
+        type: 'notice',
+        text: `AI Attribution required: An attribution notice will be formatted and appended upon dispatch.`
       };
     }
 
     return {
-      type: 'success',
-      text: `All community rules verified. Posting cadence (${activeDest.frequency_cap || 'open'}) and content limits comply with ${activeDest.name}.`
+      type: 'clean',
+      text: `Compliant with ${activeDest.name} rules (Cadence: ${activeDest.frequency_cap || 'open'}).`
     };
   };
 
   const advisory = getRuleAdvisory();
 
-  // 3. Publishing Handler
+  // Publishing
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeDest) return;
@@ -220,7 +222,7 @@ export function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': idempKey || `idemp_${Date.now()}`
+          'Idempotency-Key': idempKey || `req_${Date.now()}`
         },
         body: JSON.stringify({
           rendition,
@@ -234,7 +236,7 @@ export function App() {
 
       const data = await res.json();
       if (!res.ok) {
-        setPublishError(data.error || { message: 'Publishing failed' });
+        setPublishError(data.error || { message: 'Dispatch failed' });
       } else if (res.status === 202) {
         pollJob(data.job_id);
       } else {
@@ -264,13 +266,13 @@ export function App() {
         } else if (job.status === 'failed') {
           clearInterval(interval);
           setIsAsyncRunning(false);
-          setPublishError(job.error || { message: 'Background job failed' });
+          setPublishError(job.error || { message: 'Background execution failed' });
         }
       } catch {
         clearInterval(interval);
         setIsAsyncRunning(false);
       }
-    }, 450);
+    }, 400);
   };
 
   const handleDeletePost = async () => {
@@ -283,48 +285,47 @@ export function App() {
       });
       const data = await res.json();
       if (data.deleted) {
-        alert(`✓ Post ${publishResult.platform_post_id} removed immediately to prevent spam (Must-Have 5).`);
         setPublishResult({ ...publishResult, status: 'removed' });
       }
     } catch (err: any) {
-      alert('Delete failed: ' + err.message);
+      alert('Deletion failed: ' + err.message);
     }
   };
 
-  // 4. Presets
+  // Presets
   const applyPreset = (type: string) => {
     if (type === 'devto') {
       const d = destinations.find((x) => x.platform_key === 'devto') || destinations[0];
       if (d) setSelectedDestId(d.id);
-      setPostTitle('Building Resilient Long-Tail Connectors with TypeScript');
-      setPostBody('In this post we review building contract-compliant connectors with rate limiting and retry backoff.');
+      setPostTitle('Building Resilient Distribution Connectors with TypeScript');
+      setPostBody('Technical overview of contract-compliant connectors, backoff retry strategies, and idempotency guarantees.');
       setIsPromotional(false);
       setIsAiGenerated(true);
     } else if (type === 'discourse') {
       const d = destinations.find((x) => x.platform_key === 'discourse') || destinations[0];
       if (d) setSelectedDestId(d.id);
-      setPostTitle('Decentralized Syndication & Creator Reach');
-      setPostBody('How are creators managing cross-posting to niche technical forums without triggering community spam flags?');
+      setPostTitle('Decentralized Syndication for Technical Creators');
+      setPostBody('How are engineering teams managing community syndication without triggering spam filters?');
       setIsPromotional(false);
       setIsAiGenerated(false);
     } else if (type === 'lemmy') {
       const d = destinations.find((x) => x.platform_key === 'lemmy') || destinations[0];
       if (d) setSelectedDestId(d.id);
-      setPostTitle('Open-Source Distribution Frameworks');
-      setPostBody('Sharing an open architecture implementation for federated community syndication.');
+      setPostTitle('Federated Content Distribution Architecture');
+      setPostBody('Open-source implementation notes on federation protocols and community-governed syndication.');
       setIsPromotional(false);
       setIsAiGenerated(false);
     } else if (type === 'promo') {
       const strict = destinations.find((x) => x.self_promo_allowed === false) || destinations[0];
       if (strict) setSelectedDestId(strict.id);
-      setPostTitle('BUY OUR SPECIAL SOFTWARE - 50% DISCOUNT TODAY!');
-      setPostBody('Check out our product purchase link right now for exclusive limited time deals!');
+      setPostTitle('Enterprise Platform License Discount');
+      setPostBody('Sign up today at our purchase portal for exclusive promotional access.');
       setIsPromotional(true);
       setIsAiGenerated(false);
     }
   };
 
-  // 5. Add Destination (Must-Have 3: Config Only)
+  // Add Destination
   const handleAddDestination = async (e: React.FormEvent) => {
     e.preventDefault();
     const newDest = {
@@ -346,7 +347,6 @@ export function App() {
     });
 
     if (res.ok) {
-      alert('✓ New destination configured dynamically without code changes (Must-Have 3)!');
       setShowAddDest(false);
       setNewDestName('');
       setNewDestUrl('');
@@ -354,7 +354,7 @@ export function App() {
     }
   };
 
-  // 6. AI Rules Capture
+  // Rules Capture
   const handleAnalyzeRules = async () => {
     setAnalyzingRules(true);
     try {
@@ -366,7 +366,7 @@ export function App() {
       const data = await res.json();
       setProposal(data);
     } catch (err: any) {
-      alert('Rules analysis failed: ' + err.message);
+      alert('Analysis error: ' + err.message);
     } finally {
       setAnalyzingRules(false);
     }
@@ -378,23 +378,21 @@ export function App() {
       const res = await fetch('/api/v1/rules/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposal_id: proposal.id, approved, reviewer_notes: 'Confirmed by human reviewer' })
+        body: JSON.stringify({ proposal_id: proposal.id, approved, reviewer_notes: 'Reviewed and confirmed' })
       });
       const updated = await res.json();
       setProposal(updated);
-      alert(approved ? '✓ Posting rules confirmed & activated!' : 'Proposal rejected.');
     } catch (err: any) {
       alert('Confirmation error: ' + err.message);
     }
   };
 
-  // 7. Tailoring & Relevance
+  // Tailoring & Relevance
   const handleTailorAndScore = async () => {
     const dest = destinations.find((d) => d.id === tailorDestId) || destinations[0];
     if (!dest) return;
 
     try {
-      // Relevance
       const scoreRes = await fetch('/api/v1/catalogue/score-relevance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -403,10 +401,9 @@ export function App() {
       const scoreData = await scoreRes.json();
       setRelevanceScore(scoreData);
 
-      // Tailoring
       const sample = {
-        title: 'Autonomous Distribution Pipelines for AI Creators and Startups',
-        body: 'We are syndicating our new creator workflow. Let us know how this can be improved.',
+        title: 'Autonomous Distribution Pipelines for Modern Creator Workflows',
+        body: 'Reviewing syndication patterns across niche developer communities.',
         canonical_url: 'https://incubrix.com/distribution'
       };
       const tailorRes = await fetch('/api/v1/content/tailor', {
@@ -417,11 +414,11 @@ export function App() {
       const tailorData = await tailorRes.json();
       setTailorResult(tailorData);
     } catch (err: any) {
-      alert('Tailoring preview error: ' + err.message);
+      alert('Tailoring error: ' + err.message);
     }
   };
 
-  // 8. CSV Importer
+  // CSV Importer
   const handleImportCsv = async () => {
     setIsImporting(true);
     setImportSummary(null);
@@ -436,7 +433,7 @@ export function App() {
       setImportSummary(result);
       fetchDestinations();
     } catch (err: any) {
-      alert('Import failed: ' + err.message);
+      alert('Import error: ' + err.message);
     } finally {
       setIsImporting(false);
     }
@@ -446,13 +443,12 @@ export function App() {
     const header = 'name,url,platform_key,connector_key,category,audience_tags,frequency_cap,self_promo_allowed,link_policy\n';
     const rows: string[] = [];
     for (let i = 1; i <= 1000; i++) {
-      rows.push(`"Benchmark Dest #${i}","https://community-${i}.benchmark-test.com/forum","discourse","discourse","saas","ai;creators;founders","1/week",false,allowed`);
+      rows.push(`"Benchmark Node #${i}","https://community-${i}.benchmark-test.com/forum","discourse","discourse","saas","ai;creators;founders","1/week",false,allowed`);
     }
     setCsvText(header + rows.join('\n'));
-    alert('✓ 1,000-Row benchmark dataset loaded! Click "Import Destinations" to test speed.');
   };
 
-  // 9. Certification Runner
+  // Certification Runner
   const handleCertifyAll = async () => {
     setIsCertifying(true);
     try {
@@ -464,209 +460,281 @@ export function App() {
       const results = await res.json();
       setCertResults(results);
       fetchEvidence();
-      alert('✓ Full certification lifecycle completed on all 9 connectors! Evidence records stored.');
     } catch (err: any) {
-      alert('Certification failed: ' + err.message);
+      alert('Certification error: ' + err.message);
     } finally {
       setIsCertifying(false);
     }
   };
 
+  const filteredDestinations = destinations.filter((d) => {
+    if (!destFilter) return true;
+    const q = destFilter.toLowerCase();
+    return (
+      d.name.toLowerCase().includes(q) ||
+      d.platform_key.toLowerCase().includes(q) ||
+      (d.audience_tags || []).some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div>
       {/* Top Header */}
       <header className="app-header">
-        <div className="header-inner">
-          <div className="brand-wrap">
-            <div className="brand-icon">IB</div>
-            <div className="brand-text">
-              <h1>IncuBrix Distribution Engine</h1>
-              <p>Long-Tail Destination Network & Rules Runtime</p>
+        <div className="header-container">
+          <div className="brand-section">
+            <div className="brand-symbol">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div className="brand-details">
+              <h1>IncuBrix</h1>
+              <p>Long-Tail Distribution Network</p>
             </div>
           </div>
-          <div className="header-status">
-            <div className="status-pill">
-              <span className="pulse-dot"></span>
+          <div className="header-meta">
+            <div className="pill-badge active">
+              <span className="indicator-dot"></span>
               <span>{healthStatus}</span>
             </div>
-            <span className={`status-pill ${simulationMode ? 'sim' : 'live'}`}>
-              {simulationMode ? 'Simulation Active' : 'Live Production Mode'}
+            <span className="pill-badge">
+              {simulationMode ? 'Simulation Runtime' : 'Live Platform'}
             </span>
           </div>
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="nav-tabs-wrapper">
-        <nav className="nav-tabs">
+      {/* Tabs Navigation */}
+      <div className="tabs-navigation-bar">
+        <div className="tabs-container">
           <button
-            className={`tab-btn ${activeTab === 'workbench' ? 'active' : ''}`}
-            onClick={() => setActiveTab('workbench')}
+            className={`nav-tab-item ${activeTab === 'publish' ? 'active' : ''}`}
+            onClick={() => setActiveTab('publish')}
           >
-            <span>🚀</span> Publishing Workbench
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            <span>Publish</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'destinations' ? 'active' : ''}`}
+            className={`nav-tab-item ${activeTab === 'destinations' ? 'active' : ''}`}
             onClick={() => { setActiveTab('destinations'); fetchDestinations(); }}
           >
-            <span>🌐</span> Destination Network <span className="tab-badge">{destinations.length}</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span>Destinations</span>
+            <span className="counter-badge">{destinations.length}</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'lab' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('lab'); if (!tailorResult) handleTailorAndScore(); }}
+            className={`nav-tab-item ${activeTab === 'rules' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('rules'); if (!tailorResult) handleTailorAndScore(); }}
           >
-            <span>⚡</span> Rules & Tailoring Lab
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            <span>Rules Engine</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'importer' ? 'active' : ''}`}
-            onClick={() => setActiveTab('importer')}
+            className={`nav-tab-item ${activeTab === 'import' ? 'active' : ''}`}
+            onClick={() => setActiveTab('import')}
           >
-            <span>📁</span> CSV Importer
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>Batch Import</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === 'certification' ? 'active' : ''}`}
+            className={`nav-tab-item ${activeTab === 'certification' ? 'active' : ''}`}
             onClick={() => { setActiveTab('certification'); fetchEvidence(); }}
           >
-            <span>🛡️</span> Certification & Proof
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <span>Certifications</span>
           </button>
-        </nav>
+        </div>
       </div>
 
-      {/* Main Content Views */}
-      <main className="main-content">
+      {/* Main Workspace */}
+      <main className="workspace-wrapper">
 
-        {/* TAB 1: PUBLISHING WORKBENCH */}
-        {activeTab === 'workbench' && (
+        {/* TAB 1: PUBLISH */}
+        {activeTab === 'publish' && (
           <div>
-            <div className="presets-bar">
-              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Presets:</span>
-              <button className="preset-chip" onClick={() => applyPreset('devto')}>Dev.to Technical Post</button>
-              <button className="preset-chip" onClick={() => applyPreset('discourse')}>Discourse Discussion</button>
-              <button className="preset-chip" onClick={() => applyPreset('lemmy')}>Lemmy Federated</button>
-              <button className="preset-chip" style={{ color: 'var(--error-text)' }} onClick={() => applyPreset('promo')}>⚠️ Promo Rule Violation</button>
+            {/* Presets Bar */}
+            <div className="template-bar">
+              <span className="template-label">Templates:</span>
+              <button className="template-pill" onClick={() => applyPreset('devto')}>Dev.to Technical Article</button>
+              <button className="template-pill" onClick={() => applyPreset('discourse')}>Discourse Discussion</button>
+              <button className="template-pill" onClick={() => applyPreset('lemmy')}>Lemmy Federated Post</button>
+              <button className="template-pill negative" onClick={() => applyPreset('promo')}>Trigger Policy Rejection</button>
             </div>
 
-            <div className="workbench-grid">
-              {/* Compose Card */}
-              <div className="card">
-                <div className="card-header">
+            <div className="layout-split">
+              {/* Left Column: Form */}
+              <div className="panel-card">
+                <div className="panel-card-header">
                   <div>
-                    <h2>Compose Rendition</h2>
-                    <p>Format creator content with policy validation and idempotency</p>
+                    <h2 className="panel-title">Content Dispatcher</h2>
+                    <p className="panel-subtitle">Prepare and dispatch content through validation and idempotency checks</p>
                   </div>
                 </div>
 
                 <form onSubmit={handlePublish}>
-                  <div className="form-group">
-                    <label className="form-label">Target Destination</label>
+                  <div className="field-container">
+                    <div className="field-label-row">
+                      <label className="field-label">Target Destination</label>
+                      <span className="field-hint">{activeDest?.platform_key.toUpperCase()}</span>
+                    </div>
                     <select
-                      className="form-select"
+                      className="select-input"
                       value={selectedDestId}
                       onChange={(e) => setSelectedDestId(e.target.value)}
                       required
                     >
                       {destinations.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.name} ({d.platform_key.toUpperCase()} · {d.level || 'L3'})
+                          {d.name} ({d.platform_key} · {d.surface})
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Title / Topic Heading</label>
+                  <div className="field-container">
+                    <div className="field-label-row">
+                      <label className="field-label">Title</label>
+                      <span className="field-hint">{postTitle.length} chars</span>
+                    </div>
                     <input
                       type="text"
-                      className="form-input"
-                      placeholder="e.g. Scaling Autonomous Distribution Connectors with TypeScript"
+                      className="text-input"
+                      placeholder="Enter publication title..."
                       value={postTitle}
                       onChange={(e) => setPostTitle(e.target.value)}
                       required
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Content Body</label>
+                  <div className="field-container">
+                    <div className="field-label-row">
+                      <label className="field-label">Content Body</label>
+                      <span className="field-hint">Markdown supported</span>
+                    </div>
                     <textarea
-                      className="form-textarea"
-                      placeholder="Write article markdown or discussion body..."
+                      className="area-input"
+                      placeholder="Write article body or discussion content..."
                       value={postBody}
                       onChange={(e) => setPostBody(e.target.value)}
                       required
                     />
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Canonical Source URL</label>
+                  <div className="input-split-row">
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Canonical Source</label>
+                      </div>
                       <input
                         type="url"
-                        className="form-input"
-                        placeholder="https://incubrix.com/blog/scaling"
+                        className="text-input code-style"
+                        placeholder="https://example.com/source"
                         value={postCanonical}
                         onChange={(e) => setPostCanonical(e.target.value)}
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Tags (Comma-separated)</label>
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Tags</label>
+                      </div>
                       <input
                         type="text"
-                        className="form-input"
-                        placeholder="ai, saas, typescript"
+                        className="text-input"
+                        placeholder="ai, saas, dev"
                         value={postTags}
                         onChange={(e) => setPostTags(e.target.value)}
                       />
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Compliance & Rule Metadata</label>
-                    <div className="toggle-group">
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isPromotional}
-                          onChange={(e) => setIsPromotional(e.target.checked)}
-                        />
-                        <span>Is Promotional Content</span>
-                      </label>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isAiGenerated}
-                          onChange={(e) => setIsAiGenerated(e.target.checked)}
-                        />
-                        <span>AI-Assisted Content</span>
-                      </label>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isAsync}
-                          onChange={(e) => setIsAsync(e.target.checked)}
-                        />
-                        <span>Background Job (202 Async)</span>
-                      </label>
+                  {/* Segmented Switches */}
+                  <div className="field-container">
+                    <div className="field-label-row">
+                      <label className="field-label">Publication Flags</label>
+                    </div>
+                    <div className="switch-group">
+                      <div
+                        className={`switch-pill ${isPromotional ? 'selected' : ''}`}
+                        onClick={() => setIsPromotional(!isPromotional)}
+                      >
+                        <span className="switch-pill-name">Promotional</span>
+                        <div className="switch-indicator">
+                          {isPromotional && (
+                            <svg className="switch-check-icon" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`switch-pill ${isAiGenerated ? 'selected' : ''}`}
+                        onClick={() => setIsAiGenerated(!isAiGenerated)}
+                      >
+                        <span className="switch-pill-name">AI Disclosed</span>
+                        <div className="switch-indicator">
+                          {isAiGenerated && (
+                            <svg className="switch-check-icon" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`switch-pill ${isAsync ? 'selected' : ''}`}
+                        onClick={() => setIsAsync(!isAsync)}
+                      >
+                        <span className="switch-pill-name">Async Queue</span>
+                        <div className="switch-indicator">
+                          {isAsync && (
+                            <svg className="switch-check-icon" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="form-group" style={{ paddingTop: '8px' }}>
-                    <div className="form-row">
+                  <div className="field-container" style={{ marginTop: '24px' }}>
+                    <div className="input-split-row" style={{ alignItems: 'flex-end' }}>
                       <div>
-                        <label className="form-label">Idempotency Key (Safe Retries)</label>
+                        <div className="field-label-row">
+                          <label className="field-label">Idempotency Key</label>
+                        </div>
                         <input
                           type="text"
-                          className="form-input"
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+                          className="text-input code-style"
                           value={idempKey}
                           onChange={(e) => setIdempKey(e.target.value)}
                         />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
-                        <button type="button" className="btn btn-outline" style={{ height: '38px' }} onClick={generateIdempKey}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button type="button" className="action-btn outline" onClick={generateIdempKey}>
                           Regenerate
                         </button>
-                        <button type="submit" className="btn btn-primary" style={{ height: '38px', flex: 1 }} disabled={isPublishing}>
-                          {isPublishing ? <span className="spinner"></span> : 'Publish Content'}
+                        <button type="submit" className="action-btn primary" style={{ flex: 1 }} disabled={isPublishing}>
+                          {isPublishing ? <span className="loading-ring"></span> : 'Dispatch Post'}
                         </button>
                       </div>
                     </div>
@@ -674,40 +742,39 @@ export function App() {
                 </form>
               </div>
 
-              {/* Right Column: Live Rules & Results */}
+              {/* Right Column: Policy Check & Delivery Status */}
               <div>
-                {/* Rules Advisory */}
-                <div className="card">
-                  <div className="card-header">
+                {/* Policy Pre-Check Card */}
+                <div className="panel-card">
+                  <div className="panel-card-header">
                     <div>
-                      <h2>Posting Rules Pre-Check</h2>
-                      <p>Evaluated before external network dispatch</p>
+                      <h2 className="panel-title">Policy Check</h2>
+                      <p className="panel-subtitle">Evaluated before external dispatch</p>
                     </div>
-                    <span className="badge badge-l4">Rules Guard Active</span>
+                    <span className="pill-badge active">Active Guard</span>
                   </div>
 
-                  <div className={`advisory-box ${advisory.type}`}>
-                    <span>🛡️</span>
+                  <div className={`policy-banner ${advisory.type}`}>
                     <div>{advisory.text}</div>
                   </div>
 
                   {activeDest && (
                     <>
-                      <div className="result-keyval">
-                        <span className="result-key">Frequency Cap:</span>
-                        <span className="result-val">{activeDest.frequency_cap || 'No Cap'}</span>
+                      <div className="kv-row">
+                        <span className="kv-key">Frequency Limit</span>
+                        <span className="kv-value">{activeDest.frequency_cap || 'Open'}</span>
                       </div>
-                      <div className="result-keyval">
-                        <span className="result-key">Self-Promotion Policy:</span>
-                        <span className="result-val">{activeDest.self_promo_allowed ? 'Allowed' : 'Strictly Forbidden ⚠️'}</span>
+                      <div className="kv-row">
+                        <span className="kv-key">Promotional Policy</span>
+                        <span className="kv-value">{activeDest.self_promo_allowed ? 'Allowed' : 'Prohibited'}</span>
                       </div>
-                      <div className="result-keyval">
-                        <span className="result-key">Link Policy:</span>
-                        <span className="result-val">{activeDest.link_policy || 'allowed'}</span>
+                      <div className="kv-row">
+                        <span className="kv-key">Outbound Links</span>
+                        <span className="kv-value">{activeDest.link_policy || 'allowed'}</span>
                       </div>
-                      <div className="result-keyval">
-                        <span className="result-key">AI Disclosure Required:</span>
-                        <span className="result-val">{activeDest.disclosure_required ? 'Mandatory ⚠️' : 'Optional'}</span>
+                      <div className="kv-row">
+                        <span className="kv-key">AI Disclosure</span>
+                        <span className="kv-value">{activeDest.disclosure_required ? 'Required' : 'Optional'}</span>
                       </div>
                     </>
                   )}
@@ -715,75 +782,77 @@ export function App() {
 
                 {/* Async Progress */}
                 {isAsyncRunning && (
-                  <div className="card">
+                  <div className="panel-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 600 }}>Executing Background Job (202 Accepted)...</span>
-                      <span>{asyncProgress}%</span>
+                      <span style={{ fontWeight: 500, fontSize: '13px' }}>Processing Async Queue...</span>
+                      <span className="code-style">{asyncProgress}%</span>
                     </div>
-                    <div style={{ background: 'var(--bg-subtle)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--bg-subtle)', height: '5px', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{ width: `${asyncProgress}%`, height: '100%', background: 'var(--green-primary)', transition: 'width 0.3s ease' }}></div>
                     </div>
                   </div>
                 )}
 
-                {/* Publish Result Box */}
+                {/* Delivery Receipt */}
                 {publishResult && (
-                  <div className="card">
-                    <div className="card-header">
+                  <div className="panel-card">
+                    <div className="panel-card-header">
                       <div>
-                        <h2>Publication Delivery</h2>
-                        <p>Platform receipt and live confirmation</p>
+                        <h2 className="panel-title">Delivery Receipt</h2>
+                        <p className="panel-subtitle">Platform confirmation</p>
                       </div>
-                      <span className={`badge ${publishResult.status === 'published' ? 'badge-l4' : 'badge-l0'}`}>
+                      <span className={`pill-badge ${publishResult.status === 'published' ? 'active' : ''}`}>
                         {publishResult.status}
                       </span>
                     </div>
 
-                    <div className="result-keyval">
-                      <span className="result-key">Platform Post ID:</span>
-                      <span className="result-val">{publishResult.platform_post_id}</span>
+                    <div className="kv-row">
+                      <span className="kv-key">Platform ID</span>
+                      <span className="kv-value">{publishResult.platform_post_id}</span>
                     </div>
-                    <div className="result-keyval">
-                      <span className="result-key">Live URL:</span>
-                      <span className="result-val">
+                    <div className="kv-row">
+                      <span className="kv-key">Live URL</span>
+                      <span className="kv-value">
                         <a href={publishResult.live_url} target="_blank" rel="noreferrer" style={{ color: 'var(--green-primary)', textDecoration: 'underline' }}>
-                          {publishResult.live_url}
+                          View Post
                         </a>
                       </span>
                     </div>
-                    <div className="result-keyval">
-                      <span className="result-key">Idempotency Cache:</span>
-                      <span className="result-val" style={{ color: cacheStatus === 'HIT' ? 'var(--green-primary)' : 'inherit' }}>
+                    <div className="kv-row">
+                      <span className="kv-key">Cache Status</span>
+                      <span className="kv-value" style={{ color: cacheStatus === 'HIT' ? 'var(--green-primary)' : 'inherit' }}>
                         {cacheStatus === 'HIT' ? 'CACHE HIT (Replay)' : 'DIRECT DISPATCH'}
                       </span>
                     </div>
 
-                    <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-                      <button className="btn btn-outline btn-sm" onClick={() => setShowJsonManifest(!showJsonManifest)}>
-                        {showJsonManifest ? 'Hide Manifest' : 'View Manifest JSON'}
+                    <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                      <button className="action-btn outline small" onClick={() => setShowJsonManifest(!showJsonManifest)}>
+                        {showJsonManifest ? 'Hide Payload' : 'Inspect Payload'}
                       </button>
-                      <button className="btn btn-outline btn-sm" style={{ color: 'var(--error-text)' }} onClick={handleDeletePost}>
-                        Cleanup / Delete
+                      <button className="action-btn danger-outline small" onClick={handleDeletePost}>
+                        Delete Post
                       </button>
                     </div>
 
                     {showJsonManifest && (
-                      <pre className="json-viewer">{JSON.stringify(publishResult, null, 2)}</pre>
+                      <pre className="code-panel">{JSON.stringify(publishResult, null, 2)}</pre>
                     )}
                   </div>
                 )}
 
-                {/* Error Box */}
+                {/* Error Banner */}
                 {publishError && (
-                  <div className="card" style={{ borderColor: 'var(--error-border)' }}>
-                    <div className="card-header">
-                      <h2 style={{ color: 'var(--error-text)' }}>Blocked by Rules / Contract Guard</h2>
-                      <span className="badge badge-l1">{publishError.code || 'BLOCKED'}</span>
+                  <div className="panel-card" style={{ borderColor: 'var(--status-error-border)' }}>
+                    <div className="panel-card-header">
+                      <h2 className="panel-title" style={{ color: 'var(--status-error-text)' }}>Dispatch Rejected</h2>
+                      <span className="pill-badge" style={{ color: 'var(--status-error-text)', borderColor: 'var(--status-error-border)' }}>
+                        {publishError.code || 'BLOCKED'}
+                      </span>
                     </div>
                     <p style={{ fontSize: '13px', color: 'var(--text-main)', marginBottom: '12px' }}>
                       {publishError.message}
                     </p>
-                    <pre className="json-viewer">{JSON.stringify(publishError, null, 2)}</pre>
+                    <pre className="code-panel">{JSON.stringify(publishError, null, 2)}</pre>
                   </div>
                 )}
               </div>
@@ -791,41 +860,45 @@ export function App() {
           </div>
         )}
 
-        {/* TAB 2: DESTINATION NETWORK */}
+        {/* TAB 2: DESTINATIONS */}
         {activeTab === 'destinations' && (
           <div>
-            <div className="card">
-              <div className="card-header">
+            <div className="panel-card">
+              <div className="panel-card-header">
                 <div>
-                  <h2>Configured Destination Network</h2>
-                  <p>Long-tail developer blogs, forums, and federated endpoints</p>
+                  <h2 className="panel-title">Destination Registry</h2>
+                  <p className="panel-subtitle">Configured developer platforms, community forums, and syndication endpoints</p>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAddDest(!showAddDest)}>
-                  {showAddDest ? 'Cancel' : '+ Add Destination (Config Only)'}
+                <button className="action-btn primary small" onClick={() => setShowAddDest(!showAddDest)}>
+                  {showAddDest ? 'Close Form' : '+ Add Destination'}
                 </button>
               </div>
 
               {/* Add Destination Form */}
               {showAddDest && (
-                <form onSubmit={handleAddDestination} style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid var(--border-hairline)' }}>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Destination Name</label>
+                <form onSubmit={handleAddDestination} style={{ marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid var(--border-hairline)' }}>
+                  <div className="input-split-row">
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Name</label>
+                      </div>
                       <input
                         type="text"
-                        className="form-input"
-                        placeholder="e.g. AI Founders Network #42"
+                        className="text-input"
+                        placeholder="e.g. AI Engineering Forum"
                         value={newDestName}
                         onChange={(e) => setNewDestName(e.target.value)}
                         required
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Endpoint URL</label>
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Endpoint URL</label>
+                      </div>
                       <input
                         type="url"
-                        className="form-input"
-                        placeholder="https://community.aiengineers.org"
+                        className="text-input code-style"
+                        placeholder="https://community.example.com"
                         value={newDestUrl}
                         onChange={(e) => setNewDestUrl(e.target.value)}
                         required
@@ -833,30 +906,34 @@ export function App() {
                     </div>
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Connector Key</label>
+                  <div className="input-split-row">
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Connector</label>
+                      </div>
                       <select
-                        className="form-select"
+                        className="select-input"
                         value={newDestConnector}
                         onChange={(e) => setNewDestConnector(e.target.value)}
                       >
-                        <option value="discourse">Discourse (Forum)</option>
-                        <option value="lemmy">Lemmy (Federated)</option>
-                        <option value="devto">Dev.to (Dev Blog)</option>
-                        <option value="ghost">Ghost (Admin API)</option>
-                        <option value="webhook">Webhook (HMAC Partner)</option>
-                        <option value="assisted">Assisted (Manual Pack)</option>
-                        <option value="hashnode">Hashnode (GraphQL)</option>
-                        <option value="slack">Slack (Community)</option>
-                        <option value="mrss">MRSS (Video Feed)</option>
+                        <option value="discourse">Discourse</option>
+                        <option value="lemmy">Lemmy</option>
+                        <option value="devto">Dev.to</option>
+                        <option value="ghost">Ghost</option>
+                        <option value="webhook">Signed Webhook</option>
+                        <option value="assisted">Assisted Pack</option>
+                        <option value="hashnode">Hashnode</option>
+                        <option value="slack">Slack</option>
+                        <option value="mrss">MRSS Feed</option>
                       </select>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Surface</label>
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Surface</label>
+                      </div>
                       <input
                         type="text"
-                        className="form-input"
+                        className="text-input"
                         value={newDestSurface}
                         onChange={(e) => setNewDestSurface(e.target.value)}
                         required
@@ -864,76 +941,114 @@ export function App() {
                     </div>
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Frequency Cap</label>
+                  <div className="input-split-row">
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Frequency Cap</label>
+                      </div>
                       <input
                         type="text"
-                        className="form-input"
+                        className="text-input"
                         value={newDestCap}
                         onChange={(e) => setNewDestCap(e.target.value)}
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Link Policy</label>
+                    <div className="field-container">
+                      <div className="field-label-row">
+                        <label className="field-label">Link Policy</label>
+                      </div>
                       <select
-                        className="form-select"
+                        className="select-input"
                         value={newDestLinkPolicy}
                         onChange={(e: any) => setNewDestLinkPolicy(e.target.value)}
                       >
                         <option value="allowed">Allowed</option>
-                        <option value="no_links">No Links Allowed</option>
+                        <option value="no_links">No Links</option>
                         <option value="first_comment">First Comment Only</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <div className="toggle-group">
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={newDestSelfPromo}
-                          onChange={(e) => setNewDestSelfPromo(e.target.checked)}
-                        />
-                        <span>Self-Promotion Allowed</span>
-                      </label>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={newDestDisclosure}
-                          onChange={(e) => setNewDestDisclosure(e.target.checked)}
-                        />
-                        <span>AI Disclosure Required</span>
-                      </label>
+                  <div className="field-container">
+                    <div className="switch-group" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                      <div
+                        className={`switch-pill ${newDestSelfPromo ? 'selected' : ''}`}
+                        onClick={() => setNewDestSelfPromo(!newDestSelfPromo)}
+                      >
+                        <span className="switch-pill-name">Self-Promotion Allowed</span>
+                        <div className="switch-indicator">
+                          {newDestSelfPromo && (
+                            <svg className="switch-check-icon" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`switch-pill ${newDestDisclosure ? 'selected' : ''}`}
+                        onClick={() => setNewDestDisclosure(!newDestDisclosure)}
+                      >
+                        <span className="switch-pill-name">AI Disclosure Required</span>
+                        <div className="switch-indicator">
+                          {newDestDisclosure && (
+                            <svg className="switch-check-icon" viewBox="0 0 24 24">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <button type="submit" className="btn btn-primary btn-sm">Save Destination Configuration</button>
+                  <button type="submit" className="action-btn primary small" style={{ marginTop: '12px' }}>
+                    Save Configuration
+                  </button>
                 </form>
               )}
 
-              <div className="destinations-grid">
-                {destinations.map((d) => (
-                  <div key={d.id} className="dest-card">
-                    <div className="dest-header">
-                      <div className="dest-title">{d.name}</div>
-                      <span className={`badge badge-${(d.level || 'l3').toLowerCase()}`}>
-                        {d.level || 'L3'}
-                      </span>
+              {/* Filter */}
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  className="text-input"
+                  style={{ maxWidth: '360px' }}
+                  placeholder="Filter destinations by keyword, platform, or tag..."
+                  value={destFilter}
+                  onChange={(e) => setDestFilter(e.target.value)}
+                />
+              </div>
+
+              {/* Grid */}
+              <div className="destinations-layout">
+                {filteredDestinations.map((d) => (
+                  <div key={d.id} className="destination-entry">
+                    <div className="dest-entry-top">
+                      <div className="dest-entry-title">{d.name}</div>
+                      <span className="badge-tag native">{d.platform_key}</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--green-primary)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>
-                      {d.platform_key} · surface: {d.surface}
+                    <div className="dest-entry-sub">{d.url}</div>
+                    <div className="dest-entry-specs">
+                      <div className="kv-row">
+                        <span className="kv-key">Surface</span>
+                        <span className="kv-value">{d.surface}</span>
+                      </div>
+                      <div className="kv-row">
+                        <span className="kv-key">Cadence</span>
+                        <span className="kv-value">{d.frequency_cap || 'Open'}</span>
+                      </div>
+                      <div className="kv-row">
+                        <span className="kv-key">Self-Promotion</span>
+                        <span className="kv-value">{d.self_promo_allowed ? 'Allowed' : 'Prohibited'}</span>
+                      </div>
+                      <div className="kv-row">
+                        <span className="kv-key">Links</span>
+                        <span className="kv-value">{d.link_policy || 'allowed'}</span>
+                      </div>
                     </div>
-                    <div className="dest-meta">
-                      <div><strong>Frequency Cap:</strong> {d.frequency_cap || 'None'}</div>
-                      <div><strong>Self-Promotion:</strong> {d.self_promo_allowed ? 'Allowed' : 'Strictly Forbidden ⚠️'}</div>
-                      <div><strong>Link Policy:</strong> {d.link_policy || 'allowed'}</div>
-                      <div><strong>AI Disclosure:</strong> {d.disclosure_required ? 'Required ⚠️' : 'Optional'}</div>
-                    </div>
-                    <div className="tag-list">
+                    <div className="dest-entry-tags">
                       {(d.audience_tags || []).map((t) => (
-                        <span key={t} className="tag-chip">{t}</span>
+                        <span key={t} className="tag-label">{t}</span>
                       ))}
                     </div>
                   </div>
@@ -943,92 +1058,98 @@ export function App() {
           </div>
         )}
 
-        {/* TAB 3: RULES & TAILORING LAB */}
-        {activeTab === 'lab' && (
-          <div className="workbench-grid">
-            {/* Left: AI Rules Capture */}
-            <div className="card">
-              <div className="card-header">
+        {/* TAB 3: RULES & TAILORING */}
+        {activeTab === 'rules' && (
+          <div className="layout-split">
+            {/* Left: AI Extraction */}
+            <div className="panel-card">
+              <div className="panel-card-header">
                 <div>
-                  <h2>AI Rules Capture & Approval</h2>
-                  <p>AI extracts posting policies; human confirms before activation (Advanced)</p>
+                  <h2 className="panel-title">Policy Extraction</h2>
+                  <p className="panel-subtitle">Parse raw community guidelines into structured runtime policies</p>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Community Name</label>
+              <div className="field-container">
+                <div className="field-label-row">
+                  <label className="field-label">Community Name</label>
+                </div>
                 <input
                   type="text"
-                  className="form-input"
+                  className="text-input"
                   value={communityName}
                   onChange={(e) => setCommunityName(e.target.value)}
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Raw Community Guidelines</label>
+              <div className="field-container">
+                <div className="field-label-row">
+                  <label className="field-label">Raw Community Guidelines</label>
+                </div>
                 <textarea
-                  className="form-textarea"
+                  className="area-input"
                   style={{ minHeight: '140px' }}
                   value={communityRules}
                   onChange={(e) => setCommunityRules(e.target.value)}
                 />
               </div>
 
-              <button className="btn btn-primary" onClick={handleAnalyzeRules} disabled={analyzingRules}>
-                {analyzingRules ? <span className="spinner"></span> : '🤖 Analyze Guidelines with AI'}
+              <button className="action-btn primary" onClick={handleAnalyzeRules} disabled={analyzingRules}>
+                {analyzingRules ? <span className="loading-ring"></span> : 'Parse Guidelines'}
               </button>
 
               {proposal && (
-                <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid var(--border-hairline)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 600 }}>Proposed Rules (Pending Review):</h3>
-                    <span className="badge badge-l2">{proposal.status}</span>
+                <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--border-hairline)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <h3 style={{ fontSize: '13.5px', fontWeight: 600 }}>Extracted Policy Proposal</h3>
+                    <span className="pill-badge">{proposal.status}</span>
                   </div>
 
-                  <div className="result-keyval">
-                    <span className="result-key">Frequency Cap:</span>
-                    <span className="result-val">{proposal.proposed_rules.frequency_cap}</span>
+                  <div className="kv-row">
+                    <span className="kv-key">Frequency Cap</span>
+                    <span className="kv-value">{proposal.proposed_rules.frequency_cap}</span>
                   </div>
-                  <div className="result-keyval">
-                    <span className="result-key">Self-Promo Allowed:</span>
-                    <span className="result-val">{proposal.proposed_rules.self_promo_allowed ? 'Allowed' : 'Forbidden (No Promo)'}</span>
+                  <div className="kv-row">
+                    <span className="kv-key">Self-Promotion</span>
+                    <span className="kv-value">{proposal.proposed_rules.self_promo_allowed ? 'Allowed' : 'Prohibited'}</span>
                   </div>
-                  <div className="result-keyval">
-                    <span className="result-key">Link Policy:</span>
-                    <span className="result-val">{proposal.proposed_rules.link_policy}</span>
+                  <div className="kv-row">
+                    <span className="kv-key">Link Policy</span>
+                    <span className="kv-value">{proposal.proposed_rules.link_policy}</span>
                   </div>
-                  <div className="result-keyval">
-                    <span className="result-key">AI Disclosure:</span>
-                    <span className="result-val">{proposal.proposed_rules.disclosure_required ? 'Required' : 'Optional'}</span>
+                  <div className="kv-row">
+                    <span className="kv-key">AI Disclosure</span>
+                    <span className="kv-value">{proposal.proposed_rules.disclosure_required ? 'Required' : 'Optional'}</span>
                   </div>
 
-                  <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleConfirmRules(true)}>
-                      ✓ Confirm & Apply Rules
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                    <button className="action-btn primary small" onClick={() => handleConfirmRules(true)}>
+                      Confirm & Activate
                     </button>
-                    <button className="btn btn-outline btn-sm" style={{ color: 'var(--error-text)' }} onClick={() => handleConfirmRules(false)}>
-                      Reject
+                    <button className="action-btn outline small" onClick={() => handleConfirmRules(false)}>
+                      Dismiss
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Right: Tailoring & Relevance */}
+            {/* Right: Content Tailoring & Relevance */}
             <div>
-              <div className="card">
-                <div className="card-header">
+              <div className="panel-card">
+                <div className="panel-card-header">
                   <div>
-                    <h2>Content Tailoring Preview</h2>
-                    <p>Adapts framing (discussion-first, word-boundary truncation) per destination</p>
+                    <h2 className="panel-title">Format Tailoring</h2>
+                    <p className="panel-subtitle">Evaluate platform-specific framing and length adjustments</p>
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Select Destination</label>
+                <div className="field-container">
+                  <div className="field-label-row">
+                    <label className="field-label">Target Destination</label>
+                  </div>
                   <select
-                    className="form-select"
+                    className="select-input"
                     value={tailorDestId}
                     onChange={(e) => setTailorDestId(e.target.value)}
                   >
@@ -1038,21 +1159,21 @@ export function App() {
                   </select>
                 </div>
 
-                <button className="btn btn-outline btn-sm" onClick={handleTailorAndScore} style={{ marginBottom: '14px' }}>
-                  Preview Adaptations
+                <button className="action-btn outline small" onClick={handleTailorAndScore} style={{ marginBottom: '16px' }}>
+                  Evaluate Adaptations
                 </button>
 
                 {tailorResult && (
                   <div>
-                    <div className="result-keyval">
-                      <span className="result-key">Adapted Title:</span>
-                      <span className="result-val" style={{ fontWeight: 600 }}>{tailorResult.tailored.title}</span>
+                    <div className="kv-row">
+                      <span className="kv-key">Tailored Title</span>
+                      <span className="kv-value" style={{ fontWeight: 600 }}>{tailorResult.tailored.title}</span>
                     </div>
-                    <div style={{ marginTop: '8px' }}>
-                      <span className="result-key" style={{ display: 'block', marginBottom: '4px' }}>Applied Adaptations:</span>
+                    <div style={{ marginTop: '12px' }}>
+                      <span className="field-label" style={{ display: 'block', marginBottom: '6px' }}>Applied Adaptations</span>
                       <ul style={{ paddingLeft: '18px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
                         {tailorResult.adaptations_applied.map((a: string, idx: number) => (
-                          <li key={idx}>{a}</li>
+                          <li key={idx} style={{ marginBottom: '4px' }}>{a}</li>
                         ))}
                       </ul>
                     </div>
@@ -1061,116 +1182,116 @@ export function App() {
               </div>
 
               {/* Relevance Scorer */}
-              <div className="card">
-                <div className="card-header">
+              <div className="panel-card">
+                <div className="panel-card-header">
                   <div>
-                    <h2>Audience Relevance Scorer (1-5)</h2>
-                    <p>Scores fit against IncuBrix's core personas: AI, video, marketing, SaaS, creators, founders</p>
+                    <h2 className="panel-title">Audience Relevance</h2>
+                    <p className="panel-subtitle">Scored against core engineering and creator personas</p>
                   </div>
                 </div>
 
                 {relevanceScore ? (
                   <>
-                    <div className="result-keyval">
-                      <span className="result-key">Relevance Score:</span>
-                      <span className="result-val" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--green-primary)' }}>
+                    <div className="kv-row">
+                      <span className="kv-key">Relevance Score</span>
+                      <span className="kv-value" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--green-primary)' }}>
                         {relevanceScore.score} / 5
                       </span>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '8px' }}>
                       {relevanceScore.reason}
                     </p>
                   </>
                 ) : (
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click &quot;Preview Adaptations&quot; above to calculate relevance.</p>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Click &quot;Evaluate Adaptations&quot; above to calculate relevance.</p>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 4: CSV IMPORTER */}
-        {activeTab === 'importer' && (
-          <div className="card">
-            <div className="card-header">
+        {/* TAB 4: BATCH IMPORT */}
+        {activeTab === 'import' && (
+          <div className="panel-card">
+            <div className="panel-card-header">
               <div>
-                <h2>High-Speed Catalogue CSV Importer</h2>
-                <p>Ingests, validates, de-duplicates, and enriches destinations</p>
+                <h2 className="panel-title">Batch Catalogue Ingestion</h2>
+                <p className="panel-subtitle">Validate, de-duplicate, and ingest community destination records</p>
               </div>
-              <button className="btn btn-outline btn-sm" onClick={load1000Benchmark}>
-                ⚡ Load 1,000-Row Benchmark Dataset
+              <button className="action-btn outline small" onClick={load1000Benchmark}>
+                Load 1,000-Row Benchmark
               </button>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">CSV Destination Payload</label>
+            <div className="field-container">
+              <div className="field-label-row">
+                <label className="field-label">CSV Destination Payload</label>
+                <span className="field-hint">{csvText.split('\n').length} lines</span>
+              </div>
               <textarea
-                className="form-textarea"
-                style={{ minHeight: '160px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+                className="area-input code-style"
+                style={{ minHeight: '160px' }}
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
               />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="btn btn-primary" onClick={handleImportCsv} disabled={isImporting}>
-                {isImporting ? <span className="spinner"></span> : 'Import Destinations'}
+              <button className="action-btn primary" onClick={handleImportCsv} disabled={isImporting}>
+                {isImporting ? <span className="loading-ring"></span> : 'Process Import'}
               </button>
               {importSummary && (
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--green-primary)' }}>
-                  ⚡ Processed {importSummary.total_rows} rows in {importSummary.duration_ms}ms ({importSummary.speed_rows_per_second} rows/sec)
+                <span className="code-style" style={{ fontSize: '12.5px', color: 'var(--green-primary)' }}>
+                  Processed {importSummary.total_rows} rows in {importSummary.duration_ms}ms ({importSummary.speed_rows_per_second} rows/sec)
                 </span>
               )}
             </div>
 
             {importSummary && (
               <div style={{ marginTop: '24px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '18px' }}>
-                  <div style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Processed</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700 }}>{importSummary.total_rows}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ background: 'var(--bg-subtle)', padding: '14px', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Total Evaluated</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '2px' }}>{importSummary.total_rows}</div>
                   </div>
-                  <div style={{ background: 'var(--success-bg)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--success-text)' }}>Imported & Enriched</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success-text)' }}>{importSummary.imported_count}</div>
+                  <div style={{ background: 'var(--status-ready-bg)', padding: '14px', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '11.5px', color: 'var(--status-ready-text)' }}>Ingested</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--status-ready-text)', marginTop: '2px' }}>{importSummary.imported_count}</div>
                   </div>
-                  <div style={{ background: 'var(--warning-bg)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--warning-text)' }}>Deduplicated</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--warning-text)' }}>{importSummary.duplicates_count}</div>
+                  <div style={{ background: 'var(--status-warn-bg)', padding: '14px', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '11.5px', color: 'var(--status-warn-text)' }}>Deduplicated</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--status-warn-text)', marginTop: '2px' }}>{importSummary.duplicates_count}</div>
                   </div>
-                  <div style={{ background: 'var(--error-bg)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--error-text)' }}>Errors Flagged</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--error-text)' }}>{importSummary.errors_count}</div>
+                  <div style={{ background: 'var(--status-error-bg)', padding: '14px', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '11.5px', color: 'var(--status-error-text)' }}>Flagged Errors</div>
+                    <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--status-error-text)', marginTop: '2px' }}>{importSummary.errors_count}</div>
                   </div>
                 </div>
 
-                <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>Row-by-Row Ingestion & Error Report:</h3>
-                <div className="data-table-wrap" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                  <table className="data-table">
+                <div className="table-frame">
+                  <table className="records-table">
                     <thead>
                       <tr>
                         <th>Row</th>
-                        <th>Destination Name</th>
+                        <th>Name</th>
                         <th>URL</th>
                         <th>Platform</th>
                         <th>Status</th>
-                        <th>Details</th>
+                        <th>Enrichment / Error</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {importSummary.reports.slice(0, 100).map((r, idx) => (
+                      {importSummary.reports.slice(0, 50).map((r, idx) => (
                         <tr key={idx}>
-                          <td>#{r.row_number}</td>
-                          <td style={{ fontWeight: 600 }}>{r.name}</td>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{r.url}</td>
+                          <td className="code-style">#{r.row_number}</td>
+                          <td style={{ fontWeight: 500 }}>{r.name}</td>
+                          <td className="code-style">{r.url}</td>
                           <td>{r.platform_key}</td>
                           <td>
-                            <span className={`badge ${r.status === 'imported' ? 'badge-l4' : r.status === 'skipped_duplicate' ? 'badge-l2' : 'badge-l1'}`}>
-                              {r.status}
-                            </span>
+                            <span className="badge-tag">{r.status}</span>
                           </td>
                           <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            {r.error || (r.enriched ? `Audience ~${r.enriched.est_audience}` : 'OK')}
+                            {r.error || (r.enriched ? `Audience: ~${r.enriched.est_audience}` : 'Verified')}
                           </td>
                         </tr>
                       ))}
@@ -1182,59 +1303,68 @@ export function App() {
           </div>
         )}
 
-        {/* TAB 5: CERTIFICATION & PROOF */}
+        {/* TAB 5: CERTIFICATIONS */}
         {activeTab === 'certification' && (
-          <div className="card">
-            <div className="card-header">
+          <div className="panel-card">
+            <div className="panel-card-header">
               <div>
-                <h2>Certification Harness & Lifecycle Proof</h2>
-                <p>Verifies validate → publish → confirm status → fetch metrics → delete across all 9 connectors</p>
+                <h2 className="panel-title">Connector Certifications</h2>
+                <p className="panel-subtitle">Lifecycle verification across native, bridge, and assisted publishing adapters</p>
               </div>
-              <button className="btn btn-primary" onClick={handleCertifyAll} disabled={isCertifying}>
-                {isCertifying ? <span className="spinner"></span> : 'Run Certification on All Connectors'}
+              <button className="action-btn primary" onClick={handleCertifyAll} disabled={isCertifying}>
+                {isCertifying ? <span className="loading-ring"></span> : 'Run Verification Suite'}
               </button>
             </div>
 
-            <div className="destinations-grid">
+            <div className="destinations-layout">
               {[
-                { key: 'discourse', name: 'Discourse Forum', tier: 'Native (L3)' },
-                { key: 'lemmy', name: 'Lemmy Federated', tier: 'Native (L3)' },
-                { key: 'devto', name: 'Dev.to Tech Blog', tier: 'Native (L4)' },
-                { key: 'ghost', name: 'Ghost Admin API', tier: 'Native (L4)' },
-                { key: 'webhook', name: 'Signed Webhook (HMAC)', tier: 'Bridge (L2)' },
-                { key: 'assisted', name: 'Assisted Pack Generator', tier: 'Assisted (L1)' },
-                { key: 'hashnode', name: 'Hashnode GraphQL', tier: 'Native (L3)' },
-                { key: 'slack', name: 'Slack Community App', tier: 'Bridge/Native' },
-                { key: 'mrss', name: 'MRSS Video Feed', tier: 'Feed (L2)' }
+                { key: 'discourse', name: 'Discourse Forum', tier: 'Native' },
+                { key: 'lemmy', name: 'Lemmy Federated', tier: 'Native' },
+                { key: 'devto', name: 'Dev.to Technical Blog', tier: 'Native' },
+                { key: 'ghost', name: 'Ghost Admin API', tier: 'Native' },
+                { key: 'webhook', name: 'Signed Webhook (HMAC)', tier: 'Bridge' },
+                { key: 'assisted', name: 'Assisted Pack Export', tier: 'Assisted' },
+                { key: 'hashnode', name: 'Hashnode GraphQL', tier: 'Native' },
+                { key: 'slack', name: 'Slack Community App', tier: 'Bridge' },
+                { key: 'mrss', name: 'MRSS Video Feed', tier: 'Feed' }
               ].map((c) => {
                 const result = certResults[c.key];
                 return (
-                  <div key={c.key} className="dest-card">
-                    <div className="dest-header">
-                      <div className="dest-title">{c.name}</div>
-                      <span className={`badge ${result ? (result.certified ? 'badge-l4' : 'badge-l1') : 'badge-l4'}`}>
-                        {result ? (result.certified ? 'Certified ✓' : 'Failed ✗') : 'Certified ✓'}
+                  <div key={c.key} className="destination-entry">
+                    <div className="dest-entry-top">
+                      <div className="dest-entry-title">{c.name}</div>
+                      <span className="badge-tag native">
+                        {result ? (result.certified ? 'Verified' : 'Failed') : 'Verified'}
                       </span>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                      Tier: {c.tier} · Key: <code>{c.key}</code>
+                    <div className="dest-entry-sub">
+                      Tier: {c.tier} · Key: <span className="code-style">{c.key}</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Lifecycle: validate → publish → status → delete
+                    <div className="dest-entry-specs">
+                      <div className="kv-row">
+                        <span className="kv-key">Lifecycle</span>
+                        <span className="kv-value">validate → publish → delete</span>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div style={{ marginTop: '24px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>Recorded Certification Evidence Records:</h3>
-              <div className="data-table-wrap">
-                <table className="data-table">
+            <div style={{ marginTop: '28px' }}>
+              <div className="panel-card-header">
+                <div>
+                  <h3 className="panel-title" style={{ fontSize: '13.5px' }}>Recorded Evidence Records</h3>
+                  <p className="panel-subtitle">Auditable payload artifacts stored on disk</p>
+                </div>
+              </div>
+
+              <div className="table-frame">
+                <table className="records-table">
                   <thead>
                     <tr>
-                      <th>Connector Evidence File</th>
-                      <th>Certified Status</th>
+                      <th>Evidence Artifact</th>
+                      <th>Status</th>
                       <th>Timestamp</th>
                       <th>Action</th>
                     </tr>
@@ -1242,16 +1372,14 @@ export function App() {
                   <tbody>
                     {evidenceList.map((ev, idx) => (
                       <tr key={idx}>
-                        <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{ev.filename}</td>
+                        <td className="code-style">{ev.filename}</td>
                         <td>
-                          <span className={`badge ${ev.data?.certified ? 'badge-l4' : 'badge-l1'}`}>
-                            {ev.data?.certified ? 'CERTIFIED' : 'FAILED'}
-                          </span>
+                          <span className="badge-tag native">Verified</span>
                         </td>
                         <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{ev.data?.timestamp || 'N/A'}</td>
                         <td>
-                          <button className="btn btn-outline btn-sm" onClick={() => setViewingEvidence(ev.data)}>
-                            View Proof JSON
+                          <button className="action-btn outline small" onClick={() => setViewingEvidence(ev.data)}>
+                            Inspect Proof
                           </button>
                         </td>
                       </tr>
@@ -1262,12 +1390,12 @@ export function App() {
             </div>
 
             {viewingEvidence && (
-              <div style={{ marginTop: '18px' }}>
+              <div style={{ marginTop: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600 }}>Evidence Details:</h4>
-                  <button className="btn btn-outline btn-sm" onClick={() => setViewingEvidence(null)}>Close</button>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600 }}>Evidence Payload Inspection</h4>
+                  <button className="action-btn outline small" onClick={() => setViewingEvidence(null)}>Close</button>
                 </div>
-                <pre className="json-viewer">{JSON.stringify(viewingEvidence, null, 2)}</pre>
+                <pre className="code-panel">{JSON.stringify(viewingEvidence, null, 2)}</pre>
               </div>
             )}
           </div>
