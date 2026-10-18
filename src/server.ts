@@ -10,6 +10,8 @@ import { connectorRouter } from './routes/connector.v1.js';
 import { apiV1Router } from './routes/api.v1.js';
 import { Logger } from './utils/logger.js';
 
+import path from 'path';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -18,6 +20,9 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(correlationMiddleware);
 app.use(idempotencyMiddleware());
+
+// Serve static frontend files
+app.use(express.static(path.resolve(process.cwd(), 'public')));
 
 // Health & Readiness Endpoints (Integration Standard 8)
 app.get('/health', (req, res) => {

@@ -315,3 +315,32 @@ apiV1Router.post('/content/tailor', (req: Request, res: Response, next: NextFunc
   }
 });
 
+/**
+ * GET /api/v1/certification/evidence
+ * Return all recorded certification evidence files
+ */
+apiV1Router.get('/certification/evidence', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const certDir = path.resolve(process.cwd(), 'data', 'certification');
+    if (!fs.existsSync(certDir)) {
+      res.status(200).json({ evidence: [] });
+      return;
+    }
+    const files = fs.readdirSync(certDir).filter((f: string) => f.endsWith('.json'));
+    const evidence = files.map((file: string) => {
+      const content = fs.readFileSync(path.join(certDir, file), 'utf8');
+      try {
+        return { filename: file, data: JSON.parse(content) };
+      } catch {
+        return { filename: file, raw: content };
+      }
+    });
+    res.status(200).json({ total: evidence.length, evidence });
+  } catch (err) {
+    next(err);
+  }
+});
+
+

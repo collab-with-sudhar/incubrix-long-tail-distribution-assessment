@@ -5,7 +5,9 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "tsc && npm run build:frontend",
     "start": "node dist/server.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:contract": "jest tests/contract --runInBand",

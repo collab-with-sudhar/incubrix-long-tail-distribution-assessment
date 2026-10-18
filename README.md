@@ -4,9 +4,26 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org)
 [![Express](https://img.shields.io/badge/Express-4.21-lightgrey.svg)](https://expressjs.com)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com)
-[![Tests](https://img.shields.io/badge/Tests-37%2F37%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-50%2F50%20Passing-brightgreen.svg)]()
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
 
-> A robust, contract-compliant connector runtime and posting rules engine designed for IncuBrix Distribution to syndicate content across developer blogs, forums, federated networks, and partner websites without spamming.
+> A robust, contract-compliant connector runtime, posting rules engine, and human-crafted React distribution workbench designed for IncuBrix Distribution to syndicate content across developer blogs, forums, federated networks, and partner websites without spamming.
+
+---
+
+## 🎨 React Distribution Workbench Frontend
+
+The repository includes a modern, minimal **React frontend** built with **Google Sans typography** and a clean **white & pastel green theme**:
+
+- **Publishing Workbench**: Compose renditions, test idempotency retries, inspect live rules pre-checks, execute sync or async background jobs, and test post deletion.
+- **Destination Network**: View all configured destinations, inspect surface constraints and frequency caps, and add new destinations via configuration with zero code.
+- **Rules & Tailoring Lab**: AI community guidelines parsing, human review & confirmation flow, per-destination content tailoring, and 1–5 audience relevance scoring.
+- **CSV Importer**: Bulk destination ingestion with 1-click 1,000-row benchmark dataset loading and row-by-row error analysis.
+- **Certification & Proof**: One-click certification suite runner with recorded JSON evidence inspection.
+
+Access it at:
+- **Production Bundle**: Served directly by the backend at `http://localhost:3000`
+- **Development Server with HMR**: Run `npm run dev:frontend` at `http://localhost:5173`
 
 ---
 
