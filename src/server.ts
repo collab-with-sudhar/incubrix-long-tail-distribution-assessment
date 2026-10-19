@@ -8,6 +8,7 @@ import { idempotencyMiddleware } from './middleware/idempotency.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { connectorRouter } from './routes/connector.v1.js';
 import { apiV1Router } from './routes/api.v1.js';
+import { mockRouter } from './routes/mock.js';
 import { Logger } from './utils/logger.js';
 
 import path from 'path';
@@ -46,6 +47,9 @@ app.use('/connector/v1', connectorRouter);
 
 // Integration Standard API routes
 app.use('/api/v1', apiV1Router);
+
+// Local Mock Servers (Discourse, Ghost, Lemmy, Webhook, Hashnode, Slack)
+app.use('/mock', mockRouter);
 
 // Global Error Handler
 app.use(errorHandler);

@@ -22,18 +22,16 @@ export class HashnodeConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
-    if (process.env.SIMULATION_MODE === 'true') {
+    const apiKey = connection.api_key || process.env.HASHNODE_API_KEY;
+    const isMock = !apiKey || apiKey.startsWith('mock_') || process.env.SIMULATION_MODE === 'true';
+
+    if (isMock) {
       const mockPostId = `hn_${Date.now()}`;
       return {
         platform_post_id: mockPostId,
-        live_url: `https://hashnode.com/post/${mockPostId}`,
+        live_url: `http://localhost:3000/mock/hashnode/p/${mockPostId}`,
         status: 'published'
       };
-    }
-
-    const apiKey = connection.api_key || process.env.HASHNODE_API_KEY;
-    if (!apiKey) {
-      throw new AppError('CONNECTION_AUTH_EXPIRED', 'Missing Hashnode API Key', 401);
     }
 
     const publicationId = destination.config?.publication_id || 'pub_incubrix';

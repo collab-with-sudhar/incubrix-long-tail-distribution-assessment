@@ -241,6 +241,7 @@ export function App() {
         pollJob(data.job_id);
       } else {
         setPublishResult(data);
+        generateIdempKey();
       }
     } catch (err: any) {
       setPublishError({ code: 'NETWORK_ERROR', message: err.message });
@@ -294,6 +295,7 @@ export function App() {
 
   // Presets
   const applyPreset = (type: string) => {
+    generateIdempKey();
     if (type === 'devto') {
       const d = destinations.find((x) => x.platform_key === 'devto') || destinations[0];
       if (d) setSelectedDestId(d.id);

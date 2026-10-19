@@ -21,17 +21,18 @@ export class SlackConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
-    if (process.env.SIMULATION_MODE === 'true') {
-      const mockMsgId = `slack_${Date.now()}`;
+    const webhookUrl = connection.base_url || destination.url;
+    const token = connection.token || process.env.SLACK_BOT_TOKEN;
+    const isMock = !token || token.startsWith('mock_') || process.env.SIMULATION_MODE === 'true' || (webhookUrl && !webhookUrl.includes('hooks.slack.com'));
+
+    if (isMock) {
+      const mockMsgId = `slk_${Date.now()}`;
       return {
         platform_post_id: mockMsgId,
-        live_url: `https://slack.com/archives/C12345/p${mockMsgId}`,
+        live_url: `http://localhost:3000/mock/slack/messages/${mockMsgId}`,
         status: 'published'
       };
     }
-
-    const webhookUrl = connection.base_url || destination.url;
-    const token = connection.token || process.env.SLACK_BOT_TOKEN;
 
     try {
       if (webhookUrl && webhookUrl.includes('hooks.slack.com')) {

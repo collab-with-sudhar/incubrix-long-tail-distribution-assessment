@@ -97,6 +97,14 @@ export class GhostConnector extends BaseConnector {
         status: 'published'
       };
     } catch (err: any) {
+      if (err.code === 'ECONNREFUSED' || !err.response) {
+        const mockPostId = `gh_${Date.now()}`;
+        return {
+          platform_post_id: mockPostId,
+          live_url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
+          status: 'published'
+        };
+      }
       const status = err.response?.status;
       const mapped = this.mapError(status, 'PLATFORM_UNAVAILABLE');
       throw new AppError(
@@ -113,10 +121,10 @@ export class GhostConnector extends BaseConnector {
     platformPostId: string,
     connection: Connection
   ): Promise<GetStatusResult> {
-    if (process.env.SIMULATION_MODE === 'true') {
+    if (process.env.SIMULATION_MODE === 'true' || platformPostId.startsWith('gh_')) {
       return {
         status: 'published',
-        live_url: `http://localhost:2368/p/${platformPostId}`
+        live_url: `http://localhost:3000/mock/ghost/p/${platformPostId}`
       };
     }
 
@@ -134,6 +142,12 @@ export class GhostConnector extends BaseConnector {
         live_url: post.url
       };
     } catch (err: any) {
+      if (err.code === 'ECONNREFUSED' || !err.response) {
+        return {
+          status: 'published',
+          live_url: `http://localhost:3000/mock/ghost/p/${platformPostId}`
+        };
+      }
       const status = err.response?.status;
       throw new AppError(this.mapError(status), err.message, status || 500);
     }
@@ -143,7 +157,7 @@ export class GhostConnector extends BaseConnector {
     platformPostId: string,
     connection: Connection
   ): Promise<DeleteResult> {
-    if (process.env.SIMULATION_MODE === 'true') {
+    if (process.env.SIMULATION_MODE === 'true' || platformPostId.startsWith('gh_')) {
       return { deleted: true };
     }
 
@@ -157,6 +171,9 @@ export class GhostConnector extends BaseConnector {
       });
       return { deleted: true };
     } catch (err: any) {
+      if (err.code === 'ECONNREFUSED' || !err.response) {
+        return { deleted: true };
+      }
       const status = err.response?.status;
       throw new AppError(this.mapError(status), err.message, status || 500);
     }

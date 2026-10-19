@@ -11,19 +11,16 @@ services:
       - PORT=3000
       - NODE_ENV=development
       - SIMULATION_MODE=false
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_DIR=./data/storage
       - GHOST_API_URL=http://ghost:2368
       - GHOST_ADMIN_API_KEY=654321098765432109876543:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
       - LEMMY_INSTANCE_URL=http://lemmy:8536
       - LEMMY_USERNAME=incubrix_admin
       - LEMMY_PASSWORD=incubrix_password_123
-      - S3_ENDPOINT=http://minio:9000
-      - S3_ACCESS_KEY=minioadmin
-      - S3_SECRET_KEY=minioadmin
-      - S3_BUCKET=incubrix-artifacts
     depends_on:
       - ghost
       - lemmy
-      - minio
       - redis
     restart: unless-stopped
 
@@ -62,21 +59,6 @@ services:
       - lemmy-postgres
     restart: unless-stopped
 
-  # Local S3 Storage (Integration Standard 7)
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: incubrix-minio
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
-    volumes:
-      - minio_data:/data
-    restart: unless-stopped
-
   # Redis for Caching & Idempotency
   redis:
     image: redis:7-alpine
@@ -87,4 +69,3 @@ services:
 
 volumes:
   lemmy_pg_data:
-  minio_data:
