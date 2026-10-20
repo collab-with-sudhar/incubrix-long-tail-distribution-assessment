@@ -44,7 +44,10 @@ export abstract class BaseConnector {
   }
 
   private loadManifest(key: string): ConnectorManifest {
-    const manifestPath = path.resolve(process.cwd(), 'src', 'manifests', `${key}.yaml`);
+    let manifestPath = path.resolve(process.cwd(), 'src', 'manifests', `${key}.yaml`);
+    if (!fs.existsSync(manifestPath)) {
+      manifestPath = path.resolve(process.cwd(), 'dist', 'manifests', `${key}.yaml`);
+    }
     if (!fs.existsSync(manifestPath)) {
       throw new Error(`Manifest not found for connector: ${key} at ${manifestPath}`);
     }

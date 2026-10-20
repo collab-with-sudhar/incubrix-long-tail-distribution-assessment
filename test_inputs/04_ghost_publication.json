@@ -1,0 +1,10 @@
+{
+  "rendition": {
+    "title": "Scaling Distribution Connectors with TypeScript",
+    "body": "Detailed architectural breakdown of contract-compliant connectors, backoff retry patterns, and idempotency guarantees in Node.js.",
+    "is_promotional": false,
+    "is_ai_generated": false,
+    "tags": ["engineering", "typescript", "architecture"]
+  },
+  "destination_id": "dest_ghost_blog"
+}

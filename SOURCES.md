@@ -13,6 +13,8 @@ All libraries, frameworks, tools, and dependencies used in this submission are l
 | **CORS** | ^2.8.5 | MIT | Cross-origin resource sharing middleware | https://github.com/expressjs/cors |
 | **dotenv** | ^16.4.7 | BSD-2-Clause | Environment configuration manager | https://github.com/motdotla/dotenv |
 | **js-yaml** | ^4.1.0 | MIT | YAML parser for connector manifests | https://github.com/nodeca/js-yaml |
+| **multer** | ^1.4.5-lts.1 | MIT | Multipart form file upload middleware | https://github.com/expressjs/multer |
+| **zod** | ^3.24.2 | MIT | Schema declaration and contract validation | https://zod.dev |
 | **uuid** | ^11.0.5 | MIT | UUID generation for jobs & idempotency | https://github.com/uuidjs/uuid |
 | **supertest** | ^7.0.0 | MIT | HTTP integration testing utility | https://github.com/ladjs/supertest |
 | **Jest** | ^29.7.0 | MIT | Test runner and assertion library | https://jestjs.io |

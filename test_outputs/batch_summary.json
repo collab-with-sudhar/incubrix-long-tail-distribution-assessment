@@ -1,6 +1,6 @@
 {
-  "total": 3,
-  "succeeded": 2,
+  "total": 6,
+  "succeeded": 5,
   "failed": 1,
   "results": [
     {
@@ -33,6 +33,21 @@
         }
       },
       "output_file": "03_rule_violation_promo_result.json"
+    },
+    {
+      "file": "04_ghost_publication.json",
+      "status": "succeeded",
+      "output_file": "04_ghost_publication_result.json"
+    },
+    {
+      "file": "05_webhook_syndication.json",
+      "status": "succeeded",
+      "output_file": "05_webhook_syndication_result.json"
+    },
+    {
+      "file": "06_assisted_community_post.json",
+      "status": "succeeded",
+      "output_file": "06_assisted_community_post_result.json"
     }
   ]
 }

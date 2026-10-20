@@ -1,0 +1,9 @@
+{
+  "rendition": {
+    "title": "Lessons Learned Bootstrapping a SaaS Distribution Engine",
+    "body": "Discussion on how we built resilient community distribution connectors without automated spamming.",
+    "is_promotional": false,
+    "is_ai_generated": true
+  },
+  "destination_id": "dest_assisted_forum"
+}

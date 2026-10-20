@@ -1,33 +1,12 @@
-# IncuBrix Distribution: Long-Tail Destination Network
+# IncuBrix Long-Tail Distribution Connector Service
 
-[![Node](https://img.shields.io/badge/Node-20%2B-green.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org)
-[![Express](https://img.shields.io/badge/Express-4.21-lightgrey.svg)](https://expressjs.com)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com)
-[![Tests](https://img.shields.io/badge/Tests-50%2F50%20Passing-brightgreen.svg)]()
-[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev)
+A contract-compliant connector service and posting rules engine designed to syndicate creator and B2B content across long-tail platforms (developer blogs, forums, federated networks, and partner webhooks) without spamming or violating community rules.
 
-> A robust, contract-compliant connector runtime, posting rules engine, and human-crafted React distribution workbench designed for IncuBrix Distribution to syndicate content across developer blogs, forums, federated networks, and partner websites without spamming.
+Built in **TypeScript (Node 22)** and **Express.js**, featuring pre-publish policy enforcement, double-layer idempotency, an automated 10-minute test post cleanup reaper, file storage ingestion, and a minimal React dashboard.
 
 ---
 
-## 🎨 React Distribution Workbench Frontend
-
-The repository includes a modern, minimal **React frontend** built with **Google Sans typography** and a clean **white & pastel green theme**:
-
-- **Publishing Workbench**: Compose renditions, test idempotency retries, inspect live rules pre-checks, execute sync or async background jobs, and test post deletion.
-- **Destination Network**: View all configured destinations, inspect surface constraints and frequency caps, and add new destinations via configuration with zero code.
-- **Rules & Tailoring Lab**: AI community guidelines parsing, human review & confirmation flow, per-destination content tailoring, and 1–5 audience relevance scoring.
-- **CSV Importer**: Bulk destination ingestion with 1-click 1,000-row benchmark dataset loading and row-by-row error analysis.
-- **Certification & Proof**: One-click certification suite runner with recorded JSON evidence inspection.
-
-Access it at:
-- **Production Bundle**: Served directly by the backend at `http://localhost:3000`
-- **Development Server with HMR**: Run `npm run dev:frontend` at `http://localhost:5173`
-
----
-
-## 🏛️ Architecture Overview
+## Architecture Overview
 
 ```
                                +-------------------------------------+
@@ -47,7 +26,7 @@ Access it at:
                                +-------------------------------------+
                                |        Request Middleware           |
                                |  - X-Correlation-Id Injection       |
-                               |  - Idempotency Safe Retry Store     |
+                               |  - Idempotency Safe Retry Lock      |
                                |  - Secret Token Redaction Logger    |
                                +-------------------------------------+
                                                   |
@@ -73,23 +52,18 @@ Access it at:
    |  (Forum)  |    | (Federated) |        |  (Dev Blog) |    |  (Admin)  |    |  (Partner)   |
    +-----------+    +-------------+        +-------------+    +-----------+    +--------------+
          |                 |                      |                 |                 |
-         +-----------------+----------------------+-----------------+-----------------+
-                                                  |
-                                                  v
-                               +-------------------------------------+
-                               |    Local Sandboxes / Mocks / APIs   |
-                               |  Ghost Blog (2368)  Lemmy (8536)    |
-                               +-------------------------------------+
+   +-----------+    +-------------+        +-------------+    +-----------+    +--------------+
+   | Assisted  |    |  Hashnode   |        |    Slack    |    |   MRSS    |    | Local Storage|
+   | (Human)   |    |  (GraphQL)  |        |  (Incoming) |    |  (Feed)   |    | (S3/Files)   |
+   +-----------+    +-------------+        +-------------+    +-----------+    +--------------+
 ```
 
 ---
 
-## 🚀 Quickstart in Under 5 Commands
+## Quickstart (Under 5 Commands)
 
-### 1. Clone & Install Dependencies
+### 1. Install Dependencies
 ```bash
-git clone <repo-url>
-cd incubrix-distribution-service
 npm install
 ```
 
@@ -97,33 +71,80 @@ npm install
 ```bash
 cp .env.example .env
 ```
+*(Runs out of the box with zero paid API keys in simulation and local container mode).*
 
-### 3. Run All Automated Tests (No API keys required)
+### 3. Run All Automated Tests
 ```bash
 npm test
 ```
-*Executes unit, contract, idempotency, and end-to-end tests in simulation mode.*
+*Runs all 55 tests across 6 test suites (unit, contract, rules, reaper, idempotency, and advanced benchmarks).*
 
-### 4. Run Certification on All 6 Core Connectors
+### 4. Run Connector Certification Harness
 ```bash
 npm run test:certification
 ```
-*Verifies validate -> publish -> confirm status -> metrics -> deletion cleanup and writes evidence.*
+*Certifies all 9 connectors (6 Core + 3 Advanced) and writes audit evidence files to `data/certification/`.*
 
-### 5. Run the Service
+### 5. Start the Application
 ```bash
-# Development mode with hot-reload
+# Option A: Start backend service (instant local execution)
 npm run dev
 
-# Or using Docker Compose for complete local ecosystem (Ghost, Lemmy, MinIO, Redis)
+# Option B: Run full Docker Compose environment (Service, Ghost, Lemmy, Redis, Postgres)
 docker compose up -d
+```
+Access the web dashboard at: **`http://localhost:3000`**
+
+---
+
+## Verified Connectors (6 Core + 3 Advanced)
+
+1. **Discourse (`native`)**: Topic syndication with auto-tagging and guidelines compliance.
+2. **Lemmy (`protocol`)**: ActivityPub / JSON API federated community post publisher.
+3. **Dev.to (`bridge`)**: Markdown developer article syndication with main image attachments.
+4. **Ghost (`native`)**: Ghost Admin API v5 with short-lived HS256 JWT generation and slug handling.
+5. **Generic Webhook (`bridge`)**: Partner network event dispatch with SHA256 HMAC signature verification (`x-signature-sha256`).
+6. **Assisted Connector (`assisted`)**: Human-in-the-loop content pack generator for communities that ban bots (Indie Hackers). Implements `buildAssistPack` and interactive portal at `/mock/assisted/submit`.
+7. **Hashnode (`native`)**: GraphQL publication API for developer blogging.
+8. **Slack (`bridge`)**: Rich block messaging and channel broadcast.
+9. **MRSS (`feed`)**: Media RSS feed XML syndication for creator podcasts and video feeds.
+
+---
+
+## Key Features & Compliance
+
+### 1. Pre-Publish Rules Engine (Must-Have 4)
+- **Frequency Caps:** Tracks post history per community (e.g. `1/week`, `2/day`). Violations return `DEST_RULE_FREQUENCY_CAP` (429) with reschedule countdown.
+- **Self-Promotion Guard:** Rejects promotional content on communities with `self_promo_allowed = false` (`PLATFORM_CONTENT_REJECTED` 422).
+- **Link Policy:** Enforces `no_links` in post bodies and flags `first_comment` requirements.
+- **Mandatory AI Disclosure:** Automatically detects missing AI disclosures and appends standardized community attribution.
+
+### 2. Safe Retries & In-Flight Deduplication (Must-Have 6 & Standard 4)
+- Every POST endpoint supports the `Idempotency-Key` header.
+- In-flight duplicate requests lock using Node's `EventEmitter` and wait for the original call, returning the identical post ID with `X-Cache-Lookup: HIT`. Zero duplicate posts created under rapid retries.
+
+### 3. 10-Minute Auto-Cleanup Reaper (Must-Have 5)
+- Tracks every test post with an automatic 10-minute Time-To-Live (TTL).
+- Expired posts are deleted from platforms automatically.
+- Instant purge endpoint available: `POST /api/v1/cleanup/purge`.
+
+### 4. Files In, Files Out (Integration Standard 7)
+- Ingest files via multipart upload or remote URL: `POST /api/v1/files/upload`.
+- Download stored files from S3/local storage: `GET /api/v1/files/:filename`.
+- Attached media assets are passed as `feature_image` / `media_urls` to destinations.
+
+### 5. CLI Batch Runner (Integration Standard 10)
+Run folders of test payloads against the API and record results to a summary file:
+```bash
+npm run batch-runner -- ./test_inputs ./test_outputs http://localhost:3000
 ```
 
 ---
 
-## 📋 Standard Shared Error Codes
+## Standard Error Codes
 
-All errors are returned in standard JSON format:
+All errors return the standard JSON envelope per Appendix B:
+
 ```json
 {
   "error": {
@@ -135,37 +156,27 @@ All errors are returned in standard JSON format:
 }
 ```
 
-| Error Code | Retry? | Meaning & Expected Action |
-|------------|--------|---------------------------|
-| `DEST_SPEC_VIOLATION` | No | Content exceeds destination limits (e.g. title too long, outbound links in restricted field). |
-| `DEST_RULE_FREQUENCY_CAP` | Later | Destination frequency cap reached (e.g. 1 post/week). Reschedule after window. |
-| `CONNECTION_AUTH_EXPIRED` | After reconnect | API token or JWT is expired/revoked. Pause and prompt owner to reconnect. |
-| `PLATFORM_RATE_LIMIT` | Yes | HTTP 429 received from platform. Exponential backoff using platform reset time. |
-| `PLATFORM_QUOTA_EXHAUSTED` | Next window | Platform daily quota exhausted. Reschedule for next quota cycle. |
-| `PLATFORM_CONTENT_REJECTED` | No | Community or platform rejected content (e.g. self-promotion violations). |
-| `PLATFORM_UNAVAILABLE` | Yes | HTTP 5xx or network timeout. Exponential retry; circuit breaker after 5 failures. |
-| `CONNECTOR_DISABLED` | No | Kill switch active for this connector. |
+| Error Code | Retry? | Meaning & Platform Action |
+|---|---|---|
+| `DEST_SPEC_VIOLATION` | No | Content violates destination limits (e.g., title too long, links in body). |
+| `DEST_RULE_FREQUENCY_CAP` | Later | Posting limit reached (e.g. 1/week). Reschedule after window. |
+| `CONNECTION_AUTH_EXPIRED` | Reconnect | API token or JWT is invalid/expired. Prompt owner to reconnect. |
+| `PLATFORM_RATE_LIMIT` | Yes | HTTP 429 received from platform. Exponential backoff using retry-after. |
+| `PLATFORM_QUOTA_EXHAUSTED` | Next cycle | Daily platform quota reached. Reschedule for next cycle. |
+| `PLATFORM_CONTENT_REJECTED` | No | Community rule violation (e.g. self-promotion banned). |
+| `PLATFORM_UNAVAILABLE` | Yes | HTTP 5xx or connection refused. Exponential retry with jitter. |
+| `CONNECTOR_DISABLED` | No | Kill switch active for connector. |
 
 ---
 
-## 📦 Batch Runner CLI Tool (Integration Standard 10)
+## Environment Variables (.env)
 
-Process batches of test inputs against the running connector service:
-
-```bash
-npm run batch-runner -- ./test_inputs ./test_outputs http://localhost:3000
-```
-
-Results and a `batch_summary.json` report are saved to the designated output folder.
-
----
-
-## 🧪 Hard Cases Tested
-
-1. **Timeout & Retry with Same Idempotency Key**: Guarantees zero duplicate posts.
-2. **Rate Limit 429**: Mapped to `PLATFORM_RATE_LIMIT` with retry window.
-3. **Expired Auth Token**: Catches invalid credentials and maps to `CONNECTION_AUTH_EXPIRED`.
-4. **Specification Violations**: Rejects oversized titles and payloads with field-level reasons (`DEST_SPEC_VIOLATION`).
-5. **Frequency Cap Window**: Blocks second post within weekly cap, returning `DEST_RULE_FREQUENCY_CAP`.
-6. **No Self-Promotion Rule**: Blocks promotional content to strict communities (`PLATFORM_CONTENT_REJECTED`).
-7. **Mandatory AI Disclosure**: Automatically verifies and appends compliant AI disclosure notes.
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | Port for the HTTP connector service |
+| `SIMULATION_MODE` | `true` | Enables zero-secret local mock runtime |
+| `STORAGE_TYPE` | `local` | `local` or `s3` object storage |
+| `STORAGE_LOCAL_DIR` | `./data/storage` | Local directory for uploaded media |
+| `GHOST_API_URL` | `http://localhost:2368` | Endpoint for local Ghost container |
+| `LEMMY_INSTANCE_URL` | `http://localhost:8536` | Endpoint for local Lemmy container |
+| `INCUBRIX_CALLBACK_SECRET` | `incubrix_secret` | Secret key for signing background job callbacks |

@@ -11,6 +11,7 @@ import {
   FetchMetricsResult
 } from '../types/contract.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class GhostConnector extends BaseConnector {
   constructor() {
@@ -61,6 +62,21 @@ export class GhostConnector extends BaseConnector {
     }
     const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '6ad64aec7fae85000163eb45:084b512876b4e5048edb65c747b1b6152830e30b8c8d280f8d7bf7491e8ae3cb';
 
+    // Format body with full HTML & embedded media assets
+    let fullHtml = rendition.body || '';
+    if (!fullHtml.startsWith('<')) {
+      fullHtml = fullHtml.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('');
+    }
+    if (rendition.media_urls && rendition.media_urls.length > 0) {
+      const mediaHtml = rendition.media_urls.map((url, i) => {
+        if (url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/')) {
+          return `<figure style="margin: 20px 0;"><img src="${url}" alt="Attachment ${i + 1}" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" /><figcaption style="color: #666; font-size: 13px; margin-top: 6px;">Attached Asset ${i + 1}</figcaption></figure>`;
+        }
+        return `<p style="margin: 12px 0;"><a href="${url}" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; color: #245E3D; text-decoration: none; font-weight: 500;">📎 View Attached File</a></p>`;
+      }).join('');
+      fullHtml = `${fullHtml}\n<div class="incubrix-media-gallery" style="margin-top: 24px;">${mediaHtml}</div>`;
+    }
+
     try {
       const token = this.generateGhostToken(apiKey);
       const response = await axios.post(
@@ -69,7 +85,7 @@ export class GhostConnector extends BaseConnector {
           posts: [
             {
               title: rendition.title || 'IncuBrix Publication',
-              html: rendition.body,
+              html: fullHtml,
               status: 'published',
               canonical_url: rendition.canonical_url,
               feature_image: (rendition.media_urls && rendition.media_urls[0]) || undefined
@@ -102,6 +118,18 @@ export class GhostConnector extends BaseConnector {
     } catch (err: any) {
       // If Ghost instance is offline or unreachable, fall back to the live mock sandbox preview on port 3000
       const mockPostId = `gh_${Date.now()}`;
+      saveMockPost({
+        id: mockPostId,
+        title: rendition.title || 'Ghost Publication Article',
+        body: fullHtml,
+        platform: 'Ghost Publisher',
+        createdAt: new Date().toISOString(),
+        url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
+        status: 'published',
+        tags: rendition.tags || ['creators', 'marketing', 'video'],
+        score: '4 / 5',
+        media_urls: rendition.media_urls
+      });
       const fallbackResult: PublishResult = {
         platform_post_id: mockPostId,
         live_url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
@@ -174,7 +202,7 @@ export class GhostConnector extends BaseConnector {
       });
       return { deleted: true };
     } catch (err: any) {
-      if (err.code === 'ECONNREFUSED' || !err.response) {
+      if (err.code === 'ECONNREFUSED' || !err.response || err.response?.status === 404) {
         return { deleted: true };
       }
       const status = err.response?.status;

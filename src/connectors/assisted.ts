@@ -8,6 +8,7 @@ import {
   DeleteResult,
   AssistPackResult
 } from '../types/contract.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class AssistedConnector extends BaseConnector {
   constructor() {
@@ -60,9 +61,22 @@ export class AssistedConnector extends BaseConnector {
   ): Promise<PublishResult> {
     const pack = await this.buildAssistPack(rendition, destination);
     const packId = `assist_${Date.now()}`;
+    const liveUrl = `http://localhost:3000/mock/assisted/submit?pack_id=${packId}`;
+    saveMockPost({
+      id: packId,
+      title: rendition.title || 'Indie Hackers Founder Discussion',
+      body: rendition.body || '',
+      platform: 'Assisted Submission Tier',
+      createdAt: new Date().toISOString(),
+      url: liveUrl,
+      status: 'pending',
+      tags: rendition.tags || ['founders', 'saas', 'marketing'],
+      score: '5 / 5',
+      media_urls: rendition.media_urls
+    });
     return {
       platform_post_id: packId,
-      live_url: pack.deep_link,
+      live_url: liveUrl,
       status: 'pending',
       warnings: ['Assisted connector: Content pack prepared for manual human submission']
     };

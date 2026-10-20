@@ -1,0 +1,10 @@
+{
+  "rendition": {
+    "title": "Partner Network Syndication Event",
+    "body": "Dispatching signed webhook event with SHA256 HMAC signature verification.",
+    "is_promotional": false,
+    "is_ai_generated": false,
+    "canonical_url": "https://incubrix.com/partner-announcement"
+  },
+  "destination_id": "dest_webhook_partner"
+}

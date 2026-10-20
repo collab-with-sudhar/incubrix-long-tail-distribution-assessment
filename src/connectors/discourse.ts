@@ -10,6 +10,7 @@ import {
   FetchMetricsResult
 } from '../types/contract.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class DiscourseConnector extends BaseConnector {
   constructor() {
@@ -27,10 +28,33 @@ export class DiscourseConnector extends BaseConnector {
       if (cached) return cached;
     }
 
+    let rawBody = rendition.body || 'Discussion content published via IncuBrix.';
+    if (rendition.media_urls && rendition.media_urls.length > 0) {
+      const mediaMarkdown = rendition.media_urls.map((url, i) => {
+        if (url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/')) {
+          return `\n\n![Media Asset ${i + 1}](${url})\n`;
+        }
+        return `\n\n[📎 View Attached Asset ${i + 1}](${url})\n`;
+      }).join('');
+      rawBody += `\n\n### Attached Media\n${mediaMarkdown}`;
+    }
+
     const isSimulation = process.env.SIMULATION_MODE === 'true';
 
     if (isSimulation) {
       const mockPostId = `disc_${Date.now()}`;
+      saveMockPost({
+        id: mockPostId,
+        title: rendition.title || 'Discussion Topic',
+        body: rawBody,
+        platform: 'Discourse Forum',
+        createdAt: new Date().toISOString(),
+        url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
+        status: 'published',
+        tags: rendition.tags || ['saas', 'developers', 'community'],
+        score: '4 / 5',
+        media_urls: rendition.media_urls
+      });
       const simResult: PublishResult = {
         platform_post_id: mockPostId,
         live_url: `${destination.url || 'http://localhost:3000/mock/discourse'}/t/topic/${mockPostId}`,
@@ -50,7 +74,7 @@ export class DiscourseConnector extends BaseConnector {
         `${baseUrl}/posts.json`,
         {
           title: rendition.title || 'Discussion Topic',
-          raw: rendition.body,
+          raw: rawBody,
           category: destination.config?.category_id
         },
         {
@@ -74,6 +98,18 @@ export class DiscourseConnector extends BaseConnector {
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         const mockPostId = `disc_${Date.now()}`;
+        saveMockPost({
+          id: mockPostId,
+          title: rendition.title || 'Discussion Topic',
+          body: rawBody,
+          platform: 'Discourse Forum',
+          createdAt: new Date().toISOString(),
+          url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
+          status: 'published',
+          tags: rendition.tags || ['saas', 'developers', 'community'],
+          score: '4 / 5',
+          media_urls: rendition.media_urls
+        });
         const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
           live_url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,

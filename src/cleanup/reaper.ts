@@ -92,6 +92,11 @@ export class TestPostReaper {
           });
         } catch (err: any) {
           post.error = err.message;
+          if (err.message?.includes('404') || err.message?.includes('not found') || err.status === 404 || err.statusCode === 404) {
+            post.deleted = true;
+            post.deletedAt = Date.now();
+            reapedCount++;
+          }
           Logger.warn(`Failed to auto-delete test post ${post.platformPostId}`, { error: err.message });
         }
       }
@@ -117,7 +122,13 @@ export class TestPostReaper {
         });
       } catch (err: any) {
         post.error = err.message;
-        errors++;
+        if (err.message?.includes('404') || err.message?.includes('not found') || err.status === 404 || err.statusCode === 404) {
+          post.deleted = true;
+          post.deletedAt = Date.now();
+          deleted++;
+        } else {
+          errors++;
+        }
       }
     }
     return { deleted, errors };

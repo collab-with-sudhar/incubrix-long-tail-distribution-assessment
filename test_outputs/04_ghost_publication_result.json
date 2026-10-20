@@ -1,0 +1,30 @@
+{
+  "platform_post_id": "6ad757530f2d96000139cc87",
+  "live_url": "http://localhost:2368/scaling-distribution-connectors-with-typescript/",
+  "status": "published",
+  "job_id": "b93218a8-ab61-4b6f-b25e-c040975e0661",
+  "manifest": {
+    "version": "1.0.0",
+    "service": "incubrix-distribution-service",
+    "engine": "express-ts-runtime",
+    "models_providers": {
+      "ai_provider": "mock",
+      "model": "gpt-4o-mini",
+      "version": "1.0.0"
+    },
+    "settings": {
+      "simulation_mode": true,
+      "frequency_cap_enforced": true,
+      "max_retry_attempts": 3
+    },
+    "seed": 42,
+    "timings": {
+      "duration_ms": 202
+    },
+    "cost_estimate_usd": 0.00015,
+    "cost_estimate": "$0.00015",
+    "licence": "Commercial use permitted",
+    "rights": "All rights reserved by creator; syndicate licence granted",
+    "warnings": []
+  }
+}

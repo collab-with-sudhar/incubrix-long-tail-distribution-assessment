@@ -1,0 +1,30 @@
+{
+  "platform_post_id": "wh_1792497491233",
+  "live_url": "http://localhost:3000/mock/webhook/events/wh_1792497491233",
+  "status": "published",
+  "job_id": "7f0f259b-2ab2-4f21-9e6e-2c5c79bf30a5",
+  "manifest": {
+    "version": "1.0.0",
+    "service": "incubrix-distribution-service",
+    "engine": "express-ts-runtime",
+    "models_providers": {
+      "ai_provider": "mock",
+      "model": "gpt-4o-mini",
+      "version": "1.0.0"
+    },
+    "settings": {
+      "simulation_mode": true,
+      "frequency_cap_enforced": true,
+      "max_retry_attempts": 3
+    },
+    "seed": 42,
+    "timings": {
+      "duration_ms": 1
+    },
+    "cost_estimate_usd": 0.00015,
+    "cost_estimate": "$0.00015",
+    "licence": "Commercial use permitted",
+    "rights": "All rights reserved by creator; syndicate licence granted",
+    "warnings": []
+  }
+}

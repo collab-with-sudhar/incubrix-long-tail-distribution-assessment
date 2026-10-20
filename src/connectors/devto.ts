@@ -10,6 +10,7 @@ import {
   FetchMetricsResult
 } from '../types/contract.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class DevtoConnector extends BaseConnector {
   constructor() {
@@ -48,12 +49,23 @@ export class DevtoConnector extends BaseConnector {
             .slice(0, 4)
         : ['incubrix', 'tech'];
 
+      let bodyMarkdown = rendition.body || 'Published via IncuBrix Distribution Network.';
+      if (rendition.media_urls && rendition.media_urls.length > 0) {
+        const mediaMarkdown = rendition.media_urls.map((url, i) => {
+          if (url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/')) {
+            return `\n\n![Media Asset ${i + 1}](${url})\n`;
+          }
+          return `\n\n[📎 View Attached Asset ${i + 1}](${url})\n`;
+        }).join('');
+        bodyMarkdown += `\n\n### Attached Media\n${mediaMarkdown}`;
+      }
+
       const response = await axios.post(
         `${targetBase}/api/articles`,
         {
           article: {
             title: rendition.title || 'IncuBrix Publication',
-            body_markdown: rendition.body || 'Published via IncuBrix Distribution Network.',
+            body_markdown: bodyMarkdown,
             published: true,
             tags: cleanTags,
             main_image: (rendition.media_urls && rendition.media_urls[0]) || undefined,
@@ -80,6 +92,18 @@ export class DevtoConnector extends BaseConnector {
     } catch (err: any) {
       if (useLocalMock) {
         const mockPostId = `dev_${Date.now()}`;
+        saveMockPost({
+          id: mockPostId,
+          title: rendition.title || 'IncuBrix Developer Article',
+          body: rendition.body || '',
+          platform: 'Dev.to Developer Blog',
+          createdAt: new Date().toISOString(),
+          url: `http://localhost:3000/mock/devto/article/${mockPostId}`,
+          status: 'published',
+          tags: rendition.tags || ['developers', 'ai', 'saas'],
+          score: '5 / 5',
+          media_urls: rendition.media_urls
+        });
         const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
           live_url: `http://localhost:3000/mock/devto/article/${mockPostId}`,

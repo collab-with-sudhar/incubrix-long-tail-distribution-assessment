@@ -1,8 +1,8 @@
 {
-  "platform_post_id": "disc_1792477310186",
-  "live_url": "http://localhost:3000/mock/discourse/t/topic/disc_1792477310186",
+  "platform_post_id": "disc_1792497490995",
+  "live_url": "http://localhost:3000/mock/discourse/t/topic/disc_1792497490995",
   "status": "published",
-  "job_id": "d35f2c43-927d-4a08-ba73-08e22f8dd660",
+  "job_id": "2b58b0d9-57ff-43f3-9e63-f08c53e98d06",
   "manifest": {
     "version": "1.0.0",
     "service": "incubrix-distribution-service",

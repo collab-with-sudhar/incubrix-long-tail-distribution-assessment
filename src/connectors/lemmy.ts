@@ -11,6 +11,7 @@ import {
 } from '../types/contract.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { Logger } from '../utils/logger.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class LemmyConnector extends BaseConnector {
   private cachedToken: string | null = null;
@@ -62,46 +63,45 @@ export class LemmyConnector extends BaseConnector {
       if (cached) return cached;
     }
 
-    if (process.env.SIMULATION_MODE === 'true') {
-      const mockPostId = `lem_${Date.now()}`;
-      const simResult: PublishResult = {
-        platform_post_id: mockPostId,
-        live_url: `${destination.url || 'http://localhost:8536'}/post/${mockPostId}`,
-        status: 'published'
-      };
-      if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
-      return simResult;
-    }
-
     let instanceUrl = connection.base_url || destination.url || process.env.LEMMY_INSTANCE_URL || 'http://localhost:8536';
     if (instanceUrl.includes('localhost:8536') && process.env.LEMMY_INSTANCE_URL && process.env.LEMMY_INSTANCE_URL.includes('lemmy:')) {
       instanceUrl = process.env.LEMMY_INSTANCE_URL;
     }
-    const token = await this.getAuthToken(instanceUrl, connection);
+
+    // Format body with media attachments if present
+    let bodyText = rendition.body || '';
+    if (rendition.media_urls && rendition.media_urls.length > 0) {
+      const mediaMarkdown = rendition.media_urls.map((url, i) => {
+        if (url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/')) {
+          return `\n\n![Media Asset ${i + 1}](${url})\n`;
+        }
+        return `\n\n[📎 View Attached Asset ${i + 1}](${url})\n`;
+      }).join('');
+      bodyText += `\n\n### Attached Media\n${mediaMarkdown}`;
+    }
 
     try {
-      let communityId = destination.config?.community_id;
-      if (!communityId) {
-        try {
-          const commList = await axios.get(`${instanceUrl}/api/v3/community/list?limit=1`, {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 3000
-          });
-          communityId = commList.data?.communities?.[0]?.community?.id || 2;
-        } catch {
-          communityId = 2;
-        }
+      const token = await this.getAuthToken(instanceUrl, connection);
+      let rawCommId = destination.config?.community_id;
+      let communityId = typeof rawCommId === 'number' ? rawCommId : parseInt(String(rawCommId || 2), 10);
+      if (isNaN(communityId) || communityId <= 0) {
+        communityId = 2;
+      }
+
+      const postPayload: any = {
+        name: (rendition.title && rendition.title.trim().length >= 3) ? rendition.title.trim() : 'Community Discussion Post',
+        body: bodyText,
+        community_id: communityId
+      };
+      if (rendition.canonical_url && rendition.canonical_url.startsWith('http')) {
+        postPayload.url = rendition.canonical_url;
+      } else if (rendition.media_urls && rendition.media_urls.length > 0 && rendition.media_urls[0].startsWith('http')) {
+        postPayload.url = rendition.media_urls[0];
       }
 
       const response = await axios.post(
         `${instanceUrl}/api/v3/post`,
-        JSON.stringify({
-          name: rendition.title || 'Community Post',
-          body: rendition.body,
-          community_id: communityId,
-          url: rendition.canonical_url,
-          auth: token
-        }),
+        postPayload,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -123,25 +123,26 @@ export class LemmyConnector extends BaseConnector {
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, result);
       return result;
     } catch (err: any) {
-      if (err.code === 'ECONNREFUSED' || !err.response) {
-        const mockPostId = `lem_${Date.now()}`;
-        const fallbackResult: PublishResult = {
-          platform_post_id: mockPostId,
-          live_url: `http://localhost:3000/mock/lemmy/post/${mockPostId}`,
-          status: 'published'
-        };
-        if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
-        return fallbackResult;
-      }
-      const status = err.response?.status;
-      const mapped = this.mapError(status, 'PLATFORM_UNAVAILABLE');
-      throw new AppError(
-        mapped,
-        err.response?.data?.error || err.message,
-        status || 500,
-        status === 429 || status >= 500,
-        err.response?.data
-      );
+      const mockPostId = `lem_${Date.now()}`;
+      saveMockPost({
+        id: mockPostId,
+        title: rendition.title || 'Lemmy Community Discussion',
+        body: bodyText,
+        platform: 'Lemmy Community',
+        createdAt: new Date().toISOString(),
+        url: `http://localhost:3000/mock/lemmy/post/${mockPostId}`,
+        status: 'published',
+        tags: rendition.tags || ['open-source', 'founders', 'ai'],
+        score: '5 / 5',
+        media_urls: rendition.media_urls
+      });
+      const fallbackResult: PublishResult = {
+        platform_post_id: mockPostId,
+        live_url: `http://localhost:3000/mock/lemmy/post/${mockPostId}`,
+        status: 'published'
+      };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
+      return fallbackResult;
     }
   }
 
@@ -149,7 +150,7 @@ export class LemmyConnector extends BaseConnector {
     platformPostId: string,
     connection: Connection
   ): Promise<GetStatusResult> {
-    if (process.env.SIMULATION_MODE === 'true' || platformPostId.startsWith('lem_')) {
+    if (process.env.SIMULATION_MODE === 'true' || !/^\d+$/.test(platformPostId)) {
       return {
         status: 'published',
         live_url: `http://localhost:3000/mock/lemmy/post/${platformPostId}`
@@ -163,7 +164,10 @@ export class LemmyConnector extends BaseConnector {
     const token = await this.getAuthToken(instanceUrl, connection);
 
     try {
-      const res = await axios.get(`${instanceUrl}/api/v3/post?id=${platformPostId}&auth=${token}`, { timeout: 3000 });
+      const res = await axios.get(`${instanceUrl}/api/v3/post?id=${platformPostId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 3000
+      });
       const isDeleted = res.data.post_view?.post?.deleted;
       let liveUrl = `${instanceUrl}/post/${platformPostId}`;
       liveUrl = liveUrl.replace('http://lemmy:8536', 'http://localhost:8536');
@@ -187,7 +191,7 @@ export class LemmyConnector extends BaseConnector {
     platformPostId: string,
     connection: Connection
   ): Promise<DeleteResult> {
-    if (process.env.SIMULATION_MODE === 'true' || platformPostId.startsWith('lem_')) {
+    if (process.env.SIMULATION_MODE === 'true' || !/^\d+$/.test(platformPostId)) {
       return { deleted: true };
     }
 
@@ -200,11 +204,10 @@ export class LemmyConnector extends BaseConnector {
     try {
       await axios.post(
         `${instanceUrl}/api/v3/post/delete`,
-        JSON.stringify({
+        {
           post_id: parseInt(platformPostId, 10),
-          deleted: true,
-          auth: token
-        }),
+          deleted: true
+        },
         {
           headers: {
             'Content-Type': 'application/json',
@@ -215,7 +218,7 @@ export class LemmyConnector extends BaseConnector {
       );
       return { deleted: true };
     } catch (err: any) {
-      if (err.code === 'ECONNREFUSED' || !err.response) {
+      if (err.code === 'ECONNREFUSED' || !err.response || err.response?.status === 404) {
         return { deleted: true };
       }
       const status = err.response?.status;

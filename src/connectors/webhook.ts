@@ -10,6 +10,7 @@ import {
   DeleteResult
 } from '../types/contract.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { saveMockPost } from '../routes/mock.js';
 
 export class WebhookConnector extends BaseConnector {
   constructor() {
@@ -33,9 +34,21 @@ export class WebhookConnector extends BaseConnector {
 
     if (process.env.SIMULATION_MODE === 'true') {
       const mockId = `wh_${Date.now()}`;
+      saveMockPost({
+        id: mockId,
+        title: rendition.title || 'Partner Ingestion Webhook Event',
+        body: JSON.stringify({ event: 'content.publish', rendition, timestamp: new Date().toISOString() }, null, 2),
+        platform: 'Partner Webhook',
+        createdAt: new Date().toISOString(),
+        url: `http://localhost:3000/mock/webhook/events/${mockId}`,
+        status: 'delivered',
+        tags: rendition.tags || ['saas', 'distribution'],
+        score: '4 / 5',
+        media_urls: rendition.media_urls
+      });
       const simResult: PublishResult = {
         platform_post_id: mockId,
-        live_url: `${destination.url || 'http://localhost:3000/mock/webhook/incoming'}/event/${mockId}`,
+        live_url: `http://localhost:3000/mock/webhook/events/${mockId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
@@ -68,8 +81,8 @@ export class WebhookConnector extends BaseConnector {
         timeout: 10000
       });
 
-      const postId = response.data?.platform_post_id || `wh_${Date.now()}`;
-      const liveUrl = response.data?.live_url || `${targetUrl}/${postId}`;
+      const postId = response.data?.platform_post_id || response.data?.id || `wh_${Date.now()}`;
+      const liveUrl = response.data?.live_url || `http://localhost:3000/mock/webhook/events/${postId}`;
       const result: PublishResult = {
         platform_post_id: String(postId),
         live_url: liveUrl,
@@ -80,6 +93,18 @@ export class WebhookConnector extends BaseConnector {
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         const postId = `wh_${Date.now()}`;
+        saveMockPost({
+          id: postId,
+          title: rendition.title || 'Partner Ingestion Webhook Fallback',
+          body: JSON.stringify({ event: 'content.publish', rendition, timestamp: new Date().toISOString() }, null, 2),
+          platform: 'Partner Webhook',
+          createdAt: new Date().toISOString(),
+          url: `http://localhost:3000/mock/webhook/events/${postId}`,
+          status: 'delivered',
+          tags: rendition.tags || ['saas', 'distribution'],
+          score: '4 / 5',
+          media_urls: rendition.media_urls
+        });
         const fallbackResult: PublishResult = {
           platform_post_id: postId,
           live_url: `http://localhost:3000/mock/webhook/events/${postId}`,

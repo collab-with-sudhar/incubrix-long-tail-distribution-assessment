@@ -1,8 +1,8 @@
 {
-  "platform_post_id": "234286",
-  "live_url": "http://localhost:3000/mock/devto/article/234286",
+  "platform_post_id": "526805",
+  "live_url": "http://localhost:3000/mock/devto/article/526805",
   "status": "published",
-  "job_id": "60a2bb17-ad95-4961-adb3-b23c1e9b0a76",
+  "job_id": "0bf1acbc-ada5-4ade-a847-883aab528759",
   "manifest": {
     "version": "1.0.0",
     "service": "incubrix-distribution-service",
@@ -19,7 +19,7 @@
     },
     "seed": 42,
     "timings": {
-      "duration_ms": 8
+      "duration_ms": 5
     },
     "cost_estimate_usd": 0.00015,
     "cost_estimate": "$0.00015",

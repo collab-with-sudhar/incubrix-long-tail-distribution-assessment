@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 export const mockRouter = Router();
 
-interface MockPostRecord {
+export interface MockPostRecord {
   id: string;
   title: string;
   body: string;
@@ -13,9 +13,14 @@ interface MockPostRecord {
   status: string;
   tags?: string[];
   score?: string;
+  media_urls?: string[];
 }
 
-const mockPostsStore = new Map<string, MockPostRecord>();
+export const mockPostsStore = new Map<string, MockPostRecord>();
+
+export function saveMockPost(record: MockPostRecord): void {
+  mockPostsStore.set(record.id, record);
+}
 
 function escapeHtml(text?: string): string {
   if (!text) return '';
@@ -25,6 +30,36 @@ function escapeHtml(text?: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+export function parseMarkdownToHtml(markdown?: string): string {
+  if (!markdown) return '';
+  if (markdown.trim().startsWith('<')) {
+    return markdown;
+  }
+
+  let html = escapeHtml(markdown);
+
+  // Convert markdown images ![alt](url)
+  html = html.replace(/!\[(.*?)\]\((.*?)\)/g, (_match, alt, url) => {
+    const cleanUrl = url.replace(/&amp;/g, '&');
+    return `<figure style="margin: 20px 0;">
+      <a href="${cleanUrl}" target="_blank">
+        <img src="${cleanUrl}" alt="${alt}" style="max-width: 100%; border-radius: 8px; border: 1px solid #D2DFD5; box-shadow: 0 4px 12px rgba(20,28,22,0.06);" />
+      </a>
+      ${alt ? `<figcaption style="color: #4F5E53; font-size: 13px; margin-top: 6px; font-weight: 500;">${alt}</figcaption>` : ''}
+    </figure>`;
+  });
+
+  // Convert markdown links [text](url)
+  html = html.replace(/\[(.*?)\]\((.*?)\)/g, (_match, text, url) => {
+    const cleanUrl = url.replace(/&amp;/g, '&');
+    return `<a href="${cleanUrl}" target="_blank" style="color: #245E3D; text-decoration: underline; font-weight: 500;">${text}</a>`;
+  });
+
+  // Replace double newlines with paragraphs, single with <br/>
+  const paragraphs = html.split(/\n\s*\n/).map(p => `<p style="margin-bottom: 14px;">${p.replace(/\n/g, '<br/>')}</p>`).join('');
+  return paragraphs;
 }
 
 function renderHtmlPreview(opts: {
@@ -38,6 +73,7 @@ function renderHtmlPreview(opts: {
   tags?: string[];
   category?: string;
   score?: string;
+  mediaUrls?: string[];
 }): string {
   const tagsHtml = (opts.tags || ['distribution', 'tech'])
     .map(t => `<span class="tag">#${escapeHtml(t)}</span>`)
@@ -265,6 +301,31 @@ function renderHtmlPreview(opts: {
         ${opts.bodyHtml}
       </div>
 
+      ${opts.mediaUrls && opts.mediaUrls.length > 0 ? `
+      <div class="media-gallery-container" style="margin-top: 24px; margin-bottom: 28px; padding: 20px; background: #FAFCFA; border: 1px solid var(--border-hairline); border-radius: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+          <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--green-primary); letter-spacing: 0.5px;">
+            Attached Ingested Assets (${opts.mediaUrls.length})
+          </span>
+          <span class="badge" style="background:#EAF5EE; color:#245E3D; font-size:11px;">Pipeline Verified</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;">
+          ${opts.mediaUrls.map((url, i) => {
+            const isImg = url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/');
+            return `
+            <div style="background: #FFFFFF; border: 1px solid var(--border-hairline); border-radius: 8px; overflow: hidden; padding: 10px;">
+              ${isImg ? `<a href="${escapeHtml(url)}" target="_blank"><img src="${escapeHtml(url)}" alt="Asset ${i+1}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 6px; display: block; border: 1px solid #E1EAE3;" /></a>` : ''}
+              <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11.5px; font-weight: 500; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Asset ${i+1}</span>
+                <a href="${escapeHtml(url)}" target="_blank" style="font-size: 11px; color: var(--green-primary); text-decoration: none; font-weight: 600;">Open Asset ↗</a>
+              </div>
+            </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      ` : ''}
+
       ${opts.tags && opts.tags.length > 0 ? `<div class="tags">${tagsHtml}</div>` : ''}
 
       <div class="metadata-grid">
@@ -367,12 +428,13 @@ mockRouter.get(['/discourse/t/:slug/:id', '/discourse/t/:id'], (req: Request, re
     badge: 'Discourse Forum • Discussion Topic',
     platform: 'Discourse',
     title: post.title,
-    bodyHtml: `<div style="white-space: pre-wrap; font-size: 15px;">${escapeHtml(post.body)}</div>`,
+    bodyHtml: parseMarkdownToHtml(post.body),
     postId: `topic_${post.id}`,
     urlPath: `/mock/discourse/t/${slug || 'topic'}/${id}`,
     timestamp: post.createdAt,
-    tags: ['saas', 'developers', 'community'],
-    score: '4 / 5'
+    tags: post.tags || ['saas', 'developers', 'community'],
+    score: post.score || '4 / 5',
+    mediaUrls: post.media_urls
   }));
 });
 
@@ -457,7 +519,7 @@ mockRouter.delete('/ghost/ghost/api/admin/posts/:id', (req: Request, res: Respon
 
 mockRouter.get(['/ghost/p/:slug', '/ghost/:slug'], (req: Request, res: Response) => {
   const { slug } = req.params;
-  const post = mockPostsStore.get(slug) || {
+  const post = mockPostsStore.get(slug) || mockPostsStore.get(`gh_${slug}`) || mockPostsStore.get(slug.replace(/^gh_/, '')) || {
     id: `gh_${slug}`,
     title: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
     body: '<p>This is a live mock publication rendered via IncuBrix Long-Tail Destination Network.</p><p>Reviewers can verify automated publishing, status checks, and lifecycle management end-to-end.</p>',
@@ -472,12 +534,13 @@ mockRouter.get(['/ghost/p/:slug', '/ghost/:slug'], (req: Request, res: Response)
     badge: 'Ghost Publication • Live Verified',
     platform: 'Ghost',
     title: post.title,
-    bodyHtml: post.body,
+    bodyHtml: parseMarkdownToHtml(post.body),
     postId: post.id,
     urlPath: `/mock/ghost/p/${slug}`,
     timestamp: post.createdAt,
-    tags: ['creators', 'marketing', 'video'],
-    score: '4 / 5'
+    tags: post.tags || ['creators', 'marketing', 'video'],
+    score: post.score || '4 / 5',
+    mediaUrls: post.media_urls
   }));
 });
 
@@ -586,12 +649,13 @@ mockRouter.get('/lemmy/post/:id', (req: Request, res: Response) => {
     badge: 'Lemmy Community • Federated Post',
     platform: 'Lemmy',
     title: post.title,
-    bodyHtml: `<div style="white-space: pre-wrap; font-size: 15px;">${escapeHtml(post.body)}</div>`,
+    bodyHtml: parseMarkdownToHtml(post.body),
     postId: `post_${id}`,
     urlPath: `/mock/lemmy/post/${id}`,
     timestamp: post.createdAt,
-    tags: ['open-source', 'founders', 'ai'],
-    score: '5 / 5'
+    tags: post.tags || ['open-source', 'founders', 'ai'],
+    score: post.score || '5 / 5',
+    mediaUrls: post.media_urls
   }));
 });
 
@@ -620,8 +684,10 @@ mockRouter.get('/lemmy/rules', (req: Request, res: Response) => {
 mockRouter.post('/webhook/incoming', (req: Request, res: Response) => {
   const eventId = `wh_evt_${Date.now()}`;
   const payload = req.body;
-  const title = payload.title || payload.event || payload.action || 'Partner Network Ingestion Event';
+  const rendition = payload.rendition || payload;
+  const title = rendition.title || payload.event || payload.action || 'Partner Network Ingestion Event';
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+  const mediaUrls: string[] = rendition.media_urls || [];
 
   const record: MockPostRecord = {
     id: eventId,
@@ -632,7 +698,8 @@ mockRouter.post('/webhook/incoming', (req: Request, res: Response) => {
     url: `http://localhost:3000/mock/webhook/events/${eventId}`,
     status: 'delivered',
     tags: ['saas', 'distribution'],
-    score: '4 / 5'
+    score: '4 / 5',
+    media_urls: mediaUrls
   };
 
   mockPostsStore.set(eventId, record);
@@ -640,13 +707,20 @@ mockRouter.post('/webhook/incoming', (req: Request, res: Response) => {
   res.status(200).json({
     received: true,
     id: eventId,
+    platform_post_id: eventId,
+    live_url: `http://localhost:3000/mock/webhook/events/${eventId}`,
     timestamp: record.createdAt
   });
 });
 
-mockRouter.get(['/webhook/events/:id', '/webhook/incoming/:id'], (req: Request, res: Response) => {
+mockRouter.get([
+  '/webhook/events/:id',
+  '/webhook/incoming/:id',
+  '/webhook/incoming/event/:id',
+  '/webhook/event/:id'
+], (req: Request, res: Response) => {
   const { id } = req.params;
-  const post = mockPostsStore.get(id) || {
+  const post = mockPostsStore.get(id) || mockPostsStore.get(`wh_evt_${id}`) || {
     id,
     title: 'Partner Webhook Event Delivery',
     body: JSON.stringify({ event: 'publication.created', event_id: id, status: 'delivered', signature_valid: true }, null, 2),
@@ -665,8 +739,9 @@ mockRouter.get(['/webhook/events/:id', '/webhook/incoming/:id'], (req: Request, 
     postId: id,
     urlPath: `/mock/webhook/events/${id}`,
     timestamp: post.createdAt,
-    tags: ['saas', 'distribution'],
-    score: '4 / 5'
+    tags: post.tags || ['saas', 'distribution'],
+    score: post.score || '4 / 5',
+    mediaUrls: post.media_urls
   }));
 });
 
@@ -811,12 +886,13 @@ mockRouter.get('/devto/article/:id', (req: Request, res: Response) => {
     badge: 'Dev.to Developer Blog • Simulation / Mock Mode',
     platform: 'Dev.to',
     title: post.title,
-    bodyHtml: post.body,
+    bodyHtml: parseMarkdownToHtml(post.body),
     postId: id,
     urlPath: `/mock/devto/article/${id}`,
     timestamp: post.createdAt,
-    tags: ['developers', 'ai', 'saas'],
-    score: '5 / 5'
+    tags: post.tags || ['developers', 'ai', 'saas'],
+    score: post.score || '5 / 5',
+    mediaUrls: post.media_urls
   }));
 });
 
@@ -859,6 +935,10 @@ mockRouter.post('/slack/api/chat.postMessage', (req: Request, res: Response) => 
  */
 mockRouter.get(['/assisted/submit', '/assisted'], (req: Request, res: Response) => {
   const packId = req.query.pack_id as string || 'assist_demo';
+  const post = mockPostsStore.get(packId);
+  const payloadTitle = post?.title || 'Building Resilient Distribution Connectors with TypeScript';
+  const payloadBody = post?.body || 'Technical overview of contract-compliant connectors, backoff retry strategies, and idempotency guarantees.';
+  const payloadMedia = post?.media_urls || [];
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1070,13 +1150,31 @@ mockRouter.get(['/assisted/submit', '/assisted'], (req: Request, res: Response) 
       </ul>
 
       <div class="section-title">Prepared Content Payload</div>
-      <div class="payload-box" id="payloadText">Building Resilient Distribution Connectors with TypeScript
+      <div class="payload-box" id="payloadText">${escapeHtml(payloadTitle)}
 
-Technical overview of contract-compliant connectors, backoff retry strategies, and idempotency guarantees.
+${escapeHtml(payloadBody)}
 
 (Note: This content was formatted and packaged by IncuBrix Assisted Tier for manual human submission.)
 
 Link: https://incubrix.com/distribution-architecture</div>
+
+      ${payloadMedia.length > 0 ? `
+      <div class="section-title" style="margin-top: 20px;">Attached Assets for Manual Upload</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px;">
+        ${payloadMedia.map((url, i) => {
+          const isImg = url.match(/\.(jpeg|jpg|png|gif|webp|svg)(\?.*)?$/i) || url.includes('/files/');
+          return `
+          <div style="background: #F9FBFA; border: 1px solid var(--border-hairline); border-radius: 8px; padding: 10px;">
+            ${isImg ? `<a href="${escapeHtml(url)}" target="_blank"><img src="${escapeHtml(url)}" alt="Asset ${i+1}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; display: block; border: 1px solid #E1EAE3;" /></a>` : ''}
+            <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11.5px; font-weight: 500; color: var(--text-main);">Asset ${i+1}</span>
+              <a href="${escapeHtml(url)}" target="_blank" style="font-size: 11px; color: var(--green-primary); text-decoration: none; font-weight: 600;">Download ↗</a>
+            </div>
+          </div>
+          `;
+        }).join('')}
+      </div>
+      ` : ''}
 
       <div class="btn-row">
         <button class="btn btn-primary" onclick="confirmSubmission()">✓ Mark Human Submission Complete</button>
