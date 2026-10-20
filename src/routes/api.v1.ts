@@ -4,6 +4,7 @@ import { globalCatalogue } from '../catalogue/store.js';
 import { RulesEngine } from '../rules/engine.js';
 import { globalJobManager } from '../jobs/manager.js';
 import { globalHarness } from '../certification/harness.js';
+import { globalTestPostReaper } from '../cleanup/reaper.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { Rendition, Destination, Connection } from '../types/contract.js';
 
@@ -112,6 +113,16 @@ apiV1Router.post('/publish', async (req: Request, res: Response, next: NextFunct
           );
           globalRulesEngine.recordPost(destination.id || destination.url);
 
+          if (pubResult && pubResult.platform_post_id) {
+            globalTestPostReaper.track({
+              platformPostId: pubResult.platform_post_id,
+              connectorKey: destination.connector_key,
+              destination,
+              connection: { base_url: destination.url, ...(connection || {}) },
+              title: preparedRendition.title
+            });
+          }
+
           globalJobManager.updateJob(job.id, {
             status: 'succeeded',
             progress: 100,
@@ -148,6 +159,16 @@ apiV1Router.post('/publish', async (req: Request, res: Response, next: NextFunct
       idempotencyKey
     );
     globalRulesEngine.recordPost(destination.id || destination.url);
+
+    if (pubResult && pubResult.platform_post_id) {
+      globalTestPostReaper.track({
+        platformPostId: pubResult.platform_post_id,
+        connectorKey: destination.connector_key,
+        destination,
+        connection: { base_url: destination.url, ...(connection || {}) },
+        title: preparedRendition.title
+      });
+    }
 
     res.status(200).json({
       ...pubResult,
@@ -342,5 +363,36 @@ apiV1Router.get('/certification/evidence', async (req: Request, res: Response, n
     next(err);
   }
 });
+
+/**
+ * GET /api/v1/cleanup/posts
+ * Must-Have 5: Active test posts tracking & countdown
+ */
+apiV1Router.get('/cleanup/posts', (req: Request, res: Response) => {
+  const posts = globalTestPostReaper.list();
+  res.status(200).json({
+    active_test_posts: posts.filter(p => !p.deleted),
+    history: posts.filter(p => p.deleted),
+    total_tracked: posts.length,
+    ttl_rule: 'Must-Have 5: All test posts auto-deleted within 10 minutes'
+  });
+});
+
+/**
+ * POST /api/v1/cleanup/purge
+ * Must-Have 5: Immediately purge/delete all tracked test posts
+ */
+apiV1Router.post('/cleanup/purge', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await globalTestPostReaper.purgeAll();
+    res.status(200).json({
+      status: 'purged',
+      ...result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 

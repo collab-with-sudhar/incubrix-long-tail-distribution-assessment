@@ -7,6 +7,8 @@ services:
     container_name: incubrix-service
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - PORT=3000
       - NODE_ENV=development
@@ -14,10 +16,16 @@ services:
       - STORAGE_TYPE=local
       - STORAGE_LOCAL_DIR=./data/storage
       - GHOST_API_URL=http://ghost:2368
-      - GHOST_ADMIN_API_KEY=654321098765432109876543:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+      - GHOST_ADMIN_API_KEY=6ad64aec7fae85000163eb45:084b512876b4e5048edb65c747b1b6152830e30b8c8d280f8d7bf7491e8ae3cb
       - LEMMY_INSTANCE_URL=http://lemmy:8536
       - LEMMY_USERNAME=incubrix_admin
       - LEMMY_PASSWORD=incubrix_password_123
+      - DEVTO_API_KEY=${DEVTO_API_KEY:-mock_devto_key}
+      - DISCOURSE_BASE_URL=http://localhost:3000/mock/discourse
+      - DISCOURSE_API_KEY=mock_discourse_key
+      - DISCOURSE_API_USERNAME=system
+      - WEBHOOK_HMAC_SECRET=incubrix_super_secret_webhook_key_2026
+      - INCUBRIX_CALLBACK_SECRET=incubrix_callback_hmac_signing_key
     depends_on:
       - ghost
       - lemmy
@@ -55,6 +63,8 @@ services:
       - "8536:8536"
     environment:
       - RUST_LOG=info
+    volumes:
+      - ./lemmy/lemmy.hjson:/config/config.hjson:ro
     depends_on:
       - lemmy-postgres
     restart: unless-stopped

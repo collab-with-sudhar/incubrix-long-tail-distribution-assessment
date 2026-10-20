@@ -20,10 +20,27 @@ import {
 export abstract class BaseConnector {
   public manifest: ConnectorManifest;
   public connectorKey: string;
+  protected idempCache: Map<string, { result: PublishResult; timestamp: number }> = new Map();
 
   constructor(connectorKey: string) {
     this.connectorKey = connectorKey;
     this.manifest = this.loadManifest(connectorKey);
+  }
+
+  protected checkIdempotency(key: string): PublishResult | undefined {
+    if (!key) return undefined;
+    const item = this.idempCache.get(key);
+    if (!item) return undefined;
+    if (Date.now() - item.timestamp > 10 * 60 * 1000) {
+      this.idempCache.delete(key);
+      return undefined;
+    }
+    return item.result;
+  }
+
+  protected recordIdempotency(key: string, result: PublishResult): void {
+    if (!key || !result) return;
+    this.idempCache.set(key, { result, timestamp: Date.now() });
   }
 
   private loadManifest(key: string): ConnectorManifest {

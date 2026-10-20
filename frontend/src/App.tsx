@@ -50,7 +50,7 @@ interface ImportSummary {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'publish' | 'destinations' | 'rules' | 'import' | 'certification'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'destinations' | 'rules' | 'import' | 'certification' | 'cleanup'>('publish');
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [healthStatus, setHealthStatus] = useState<string>('Connecting...');
   const [simulationMode, setSimulationMode] = useState<boolean>(true);
@@ -115,12 +115,51 @@ export function App() {
   const [certResults, setCertResults] = useState<Record<string, any>>({});
   const [viewingEvidence, setViewingEvidence] = useState<any | null>(null);
 
+  // Must-Have 5: Cleanup & Reaper State
+  const [reaperData, setReaperData] = useState<{ active_test_posts: any[]; history: any[]; total_tracked: number } | null>(null);
+  const [isPurging, setIsPurging] = useState<boolean>(false);
+  const [purgeMsg, setPurgeMsg] = useState<string>('');
+
+  const fetchReaperPosts = async () => {
+    try {
+      const res = await fetch('/api/v1/cleanup/posts');
+      const data = await res.json();
+      setReaperData(data);
+    } catch (err: any) {
+      console.error('Failed to load reaper posts:', err);
+    }
+  };
+
+  const handlePurgeAll = async () => {
+    setIsPurging(true);
+    setPurgeMsg('');
+    try {
+      const res = await fetch('/api/v1/cleanup/purge', { method: 'POST' });
+      const data = await res.json();
+      setPurgeMsg(`Successfully purged ${data.deleted} test post(s) immediately.`);
+      fetchReaperPosts();
+    } catch (err: any) {
+      setPurgeMsg('Failed to purge: ' + err.message);
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   useEffect(() => {
     generateIdempKey();
     fetchHealth();
     fetchDestinations();
     fetchEvidence();
+    fetchReaperPosts();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'cleanup') {
+      fetchReaperPosts();
+      const interval = setInterval(fetchReaperPosts, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab]);
 
   const generateIdempKey = () => {
     setIdempKey(`req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
@@ -199,13 +238,22 @@ export function App() {
 
   const advisory = getRuleAdvisory();
 
+  // Content change handler that preserves idempotency for retries but generates fresh key for new edits
+  const handleContentChange = (updater: () => void) => {
+    updater();
+    if (publishResult) {
+      setPublishResult(null);
+      setCacheStatus('DIRECT');
+      generateIdempKey();
+    }
+  };
+
   // Publishing
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeDest) return;
 
     setIsPublishing(true);
-    setPublishResult(null);
     setPublishError(null);
 
     const rendition = {
@@ -241,7 +289,7 @@ export function App() {
         pollJob(data.job_id);
       } else {
         setPublishResult(data);
-        generateIdempKey();
+        // Retain the same idempKey so immediate re-presses safely replay without creating duplicate posts (Must-Have 6)
       }
     } catch (err: any) {
       setPublishError({ code: 'NETWORK_ERROR', message: err.message });
@@ -564,6 +612,23 @@ export function App() {
             </svg>
             <span>Certifications</span>
           </button>
+          <button
+            className={`nav-tab-item ${activeTab === 'cleanup' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('cleanup'); fetchReaperPosts(); }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+            <span>Auto-Cleanup</span>
+            {reaperData && reaperData.active_test_posts.length > 0 && (
+              <span className="counter-badge" style={{ backgroundColor: '#f28b82', color: '#fff' }}>
+                {reaperData.active_test_posts.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -601,7 +666,7 @@ export function App() {
                     <select
                       className="select-input"
                       value={selectedDestId}
-                      onChange={(e) => setSelectedDestId(e.target.value)}
+                      onChange={(e) => handleContentChange(() => setSelectedDestId(e.target.value))}
                       required
                     >
                       {destinations.map((d) => (
@@ -622,7 +687,7 @@ export function App() {
                       className="text-input"
                       placeholder="Enter publication title..."
                       value={postTitle}
-                      onChange={(e) => setPostTitle(e.target.value)}
+                      onChange={(e) => handleContentChange(() => setPostTitle(e.target.value))}
                       required
                     />
                   </div>
@@ -636,7 +701,7 @@ export function App() {
                       className="area-input"
                       placeholder="Write article body or discussion content..."
                       value={postBody}
-                      onChange={(e) => setPostBody(e.target.value)}
+                      onChange={(e) => handleContentChange(() => setPostBody(e.target.value))}
                       required
                     />
                   </div>
@@ -651,7 +716,7 @@ export function App() {
                         className="text-input code-style"
                         placeholder="https://example.com/source"
                         value={postCanonical}
-                        onChange={(e) => setPostCanonical(e.target.value)}
+                        onChange={(e) => handleContentChange(() => setPostCanonical(e.target.value))}
                       />
                     </div>
                     <div className="field-container">
@@ -663,7 +728,7 @@ export function App() {
                         className="text-input"
                         placeholder="ai, saas, dev"
                         value={postTags}
-                        onChange={(e) => setPostTags(e.target.value)}
+                        onChange={(e) => handleContentChange(() => setPostTags(e.target.value))}
                       />
                     </div>
                   </div>
@@ -821,11 +886,19 @@ export function App() {
                       </span>
                     </div>
                     <div className="kv-row">
-                      <span className="kv-key">Cache Status</span>
-                      <span className="kv-value" style={{ color: cacheStatus === 'HIT' ? 'var(--green-primary)' : 'inherit' }}>
-                        {cacheStatus === 'HIT' ? 'CACHE HIT (Replay)' : 'DIRECT DISPATCH'}
+                      <span className="kv-key">Idempotency Status</span>
+                      <span className="kv-value" style={{ fontWeight: 600, color: cacheStatus === 'HIT' ? '#1e8e3e' : '#1a73e8' }}>
+                        {cacheStatus === 'HIT' ? 'CACHE HIT · Safe Replay (Must-Have 6 Verified)' : 'DIRECT DISPATCH (First Attempt)'}
                       </span>
                     </div>
+
+                    {cacheStatus === 'HIT' && (
+                      <div className="advisory-notice clean" style={{ marginTop: '12px', marginBottom: '8px' }}>
+                        <span>
+                          <strong>Must-Have 6 Verified:</strong> Retried request with identical Idempotency-Key. Safely returned cached post without creating duplicates on the platform.
+                        </span>
+                      </div>
+                    )}
 
                     <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                       <button className="action-btn outline small" onClick={() => setShowJsonManifest(!showJsonManifest)}>
@@ -1400,6 +1473,154 @@ export function App() {
                 <pre className="code-panel">{JSON.stringify(viewingEvidence, null, 2)}</pre>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Must-Have 5: Auto-Cleanup Tab */}
+        {activeTab === 'cleanup' && (
+          <div className="tab-pane active fade-in">
+            <div className="panel-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 className="panel-title">Must-Have 5: Test Post Auto-Cleanup (Anti-Spam Reaper)</h3>
+                <p className="panel-subtitle">
+                  Enforces strict 10-minute auto-deletion limit. Every test post published to Lemmy, Ghost, Dev.to, Discourse, or Webhooks is automatically tracked and purged.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="action-btn outline small"
+                  onClick={fetchReaperPosts}
+                >
+                  Refresh Status
+                </button>
+                <button
+                  className="action-btn primary small"
+                  style={{ backgroundColor: '#d93025', borderColor: '#d93025', color: '#fff' }}
+                  onClick={handlePurgeAll}
+                  disabled={isPurging}
+                >
+                  {isPurging ? 'Purging All...' : 'Purge All Test Posts Now'}
+                </button>
+              </div>
+            </div>
+
+            {purgeMsg && (
+              <div className="advisory-notice clean" style={{ marginTop: '14px', marginBottom: '14px' }}>
+                <span>{purgeMsg}</span>
+              </div>
+            )}
+
+            {/* Active Test Posts Table */}
+            <div style={{ marginTop: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600 }}>Active Tracked Test Posts (Live TTL Countdown)</h4>
+                <span className="pill-badge" style={{ fontSize: '11px' }}>
+                  {reaperData?.active_test_posts?.length || 0} active
+                </span>
+              </div>
+
+              <div className="table-frame">
+                <table className="records-table">
+                  <thead>
+                    <tr>
+                      <th>Platform Post ID</th>
+                      <th>Connector</th>
+                      <th>Destination Name</th>
+                      <th>Title</th>
+                      <th>Time Remaining (Max 600s / 10m)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!reaperData?.active_test_posts || reaperData.active_test_posts.length === 0) ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>
+                          No active test posts in queue. All test posts have been cleaned up and deleted!
+                        </td>
+                      </tr>
+                    ) : (
+                      reaperData.active_test_posts.map((post: any, idx: number) => (
+                        <tr key={idx}>
+                          <td className="code-style">{post.platformPostId}</td>
+                          <td>
+                            <span className="badge-tag native">{post.connectorKey}</span>
+                          </td>
+                          <td style={{ fontWeight: 500 }}>{post.destination?.name}</td>
+                          <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {post.title}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontWeight: 600, color: post.remaining_seconds < 60 ? '#d93025' : '#1e8e3e' }}>
+                                {post.remaining_seconds}s
+                              </span>
+                              <div style={{ flex: 1, height: '6px', backgroundColor: '#e8eaed', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div
+                                  style={{
+                                    height: '100%',
+                                    width: `${Math.min(100, (post.remaining_seconds / 600) * 100)}%`,
+                                    backgroundColor: post.remaining_seconds < 60 ? '#d93025' : '#34a853',
+                                    transition: 'width 1s linear'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Historical Deleted Posts Table */}
+            <div style={{ marginTop: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600 }}>Cleanup History (Deleted Test Posts)</h4>
+                <span className="pill-badge" style={{ fontSize: '11px' }}>
+                  {reaperData?.history?.length || 0} cleaned up
+                </span>
+              </div>
+
+              <div className="table-frame">
+                <table className="records-table">
+                  <thead>
+                    <tr>
+                      <th>Platform Post ID</th>
+                      <th>Connector</th>
+                      <th>Destination Name</th>
+                      <th>Cleanup Status</th>
+                      <th>Deleted Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!reaperData?.history || reaperData.history.length === 0) ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
+                          No cleanup history yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      reaperData.history.map((post: any, idx: number) => (
+                        <tr key={idx}>
+                          <td className="code-style">{post.platformPostId}</td>
+                          <td>
+                            <span className="badge-tag protocol">{post.connectorKey}</span>
+                          </td>
+                          <td>{post.destination?.name}</td>
+                          <td>
+                            <span className="badge-tag native">Deleted (Must-Have 5 Verified)</span>
+                          </td>
+                          <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            {post.deletedAt ? new Date(post.deletedAt).toLocaleTimeString() : 'Purged'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

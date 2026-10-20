@@ -26,13 +26,20 @@ export class WebhookConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
+    if (idempotencyKey) {
+      const cached = this.checkIdempotency(idempotencyKey);
+      if (cached) return cached;
+    }
+
     if (process.env.SIMULATION_MODE === 'true') {
       const mockId = `wh_${Date.now()}`;
-      return {
+      const simResult: PublishResult = {
         platform_post_id: mockId,
         live_url: `${destination.url || 'https://partner.example.com/webhook'}/event/${mockId}`,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
+      return simResult;
     }
 
     const targetUrl = connection.base_url || destination.url;
@@ -63,19 +70,23 @@ export class WebhookConnector extends BaseConnector {
 
       const postId = response.data?.platform_post_id || `wh_${Date.now()}`;
       const liveUrl = response.data?.live_url || `${targetUrl}/${postId}`;
-      return {
+      const result: PublishResult = {
         platform_post_id: String(postId),
         live_url: liveUrl,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, result);
+      return result;
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         const postId = `wh_${Date.now()}`;
-        return {
+        const fallbackResult: PublishResult = {
           platform_post_id: postId,
           live_url: `http://localhost:3000/mock/webhook/events/${postId}`,
           status: 'published'
         };
+        if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
+        return fallbackResult;
       }
       const status = err.response?.status;
       const mapped = this.mapError(status, 'PLATFORM_UNAVAILABLE');

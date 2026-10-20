@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { globalRegistry } from '../connectors/registry.js';
+import { globalTestPostReaper } from '../cleanup/reaper.js';
 import { AppError } from '../middleware/errorHandler.js';
 
 export const connectorRouter = Router();
@@ -34,6 +35,15 @@ connectorRouter.post('/:connector_key/:method', async (req: Request, res: Respon
         }
 
         const result = await connector.publish(rendition, destination, connection || {}, idempotencyKey);
+        if (result && result.platform_post_id) {
+          globalTestPostReaper.track({
+            platformPostId: result.platform_post_id,
+            connectorKey: connector_key,
+            destination,
+            connection: connection || {},
+            title: rendition.title
+          });
+        }
         res.status(200).json(result);
         return;
       }

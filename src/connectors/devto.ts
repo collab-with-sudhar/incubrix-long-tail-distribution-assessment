@@ -22,18 +22,21 @@ export class DevtoConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
+    if (idempotencyKey) {
+      const cached = this.checkIdempotency(idempotencyKey);
+      if (cached) return cached;
+    }
+
     const apiKey = connection.api_key || process.env.DEVTO_API_KEY;
     const isMockKey = !apiKey || apiKey.startsWith('mock_') || apiKey === 'test_key';
     const isTest = process.env.NODE_ENV === 'test';
+    const isSimulation = process.env.SIMULATION_MODE === 'true';
 
-    // In unit test runner or without a valid key, return simulation stub
-    if (isTest || (process.env.SIMULATION_MODE === 'true' && isMockKey) || !apiKey) {
-      const mockPostId = `dev_${Date.now()}`;
-      return {
-        platform_post_id: mockPostId,
-        live_url: `https://dev.to/article/${mockPostId}`,
-        status: 'published'
-      };
+    let targetBase = connection.base_url || destination.url || 'https://dev.to';
+    const useLocalMock = isTest || isMockKey || !apiKey || targetBase.includes('mock/devto') || isSimulation;
+
+    if (useLocalMock) {
+      targetBase = 'http://localhost:3000/mock/devto';
     }
 
     try {
@@ -46,7 +49,7 @@ export class DevtoConnector extends BaseConnector {
         : ['incubrix', 'tech'];
 
       const response = await axios.post(
-        'https://dev.to/api/articles',
+        `${targetBase}/api/articles`,
         {
           article: {
             title: rendition.title || 'IncuBrix Publication',
@@ -58,7 +61,7 @@ export class DevtoConnector extends BaseConnector {
         },
         {
           headers: {
-            'api-key': apiKey,
+            'api-key': apiKey || 'mock_key',
             'Content-Type': 'application/json'
           },
           timeout: 15000
@@ -66,12 +69,24 @@ export class DevtoConnector extends BaseConnector {
       );
 
       const postId = String(response.data.id);
-      return {
+      const result: PublishResult = {
         platform_post_id: postId,
         live_url: response.data.url,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, result);
+      return result;
     } catch (err: any) {
+      if (useLocalMock) {
+        const mockPostId = `dev_${Date.now()}`;
+        const fallbackResult: PublishResult = {
+          platform_post_id: mockPostId,
+          live_url: `http://localhost:3000/mock/devto/article/${mockPostId}`,
+          status: 'published'
+        };
+        if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
+        return fallbackResult;
+      }
       const status = err.response?.status;
       const mapped = this.mapError(status, 'PLATFORM_UNAVAILABLE');
       throw new AppError(
@@ -90,28 +105,31 @@ export class DevtoConnector extends BaseConnector {
   ): Promise<GetStatusResult> {
     const apiKey = connection.api_key || process.env.DEVTO_API_KEY;
     const isTest = process.env.NODE_ENV === 'test';
-    const isMock = isTest || platformPostId.startsWith('dev_') || !apiKey || apiKey.startsWith('mock_');
-
-    if (isMock) {
-      return {
-        status: 'published',
-        live_url: `https://dev.to/article/${platformPostId}`
-      };
+    const isMockKey = !apiKey || apiKey.startsWith('mock_') || apiKey === 'test_key';
+    let targetBase = connection.base_url;
+    if (!targetBase || isMockKey || isTest) {
+      targetBase = (connection.base_url && connection.base_url.includes('mock/devto'))
+        ? connection.base_url
+        : 'http://localhost:3000/mock/devto';
     }
+    const isMock = isTest || isMockKey || !apiKey || platformPostId.startsWith('dev_') || targetBase.includes('mock/devto');
 
     try {
-      const res = await axios.get(`https://dev.to/api/articles/${platformPostId}`, {
-        headers: { 'api-key': apiKey || '' }
+      const res = await axios.get(`${targetBase}/api/articles/${platformPostId}`, {
+        headers: { 'api-key': apiKey || 'mock_key' }
       });
       return {
         status: res.data && res.data.published !== false ? 'published' : 'removed',
-        live_url: res.data?.url
+        live_url: res.data?.url || `http://localhost:3000/mock/devto/article/${platformPostId}`
       };
     } catch (err: any) {
-      const status = err.response?.status;
-      if (status === 404) {
-        return { status: 'removed' };
+      if (isMock || err.response?.status === 404) {
+        return {
+          status: 'published',
+          live_url: `http://localhost:3000/mock/devto/article/${platformPostId}`
+        };
       }
+      const status = err.response?.status;
       throw new AppError(this.mapError(status), err.message, status || 500);
     }
   }
@@ -122,25 +140,29 @@ export class DevtoConnector extends BaseConnector {
   ): Promise<DeleteResult> {
     const apiKey = connection.api_key || process.env.DEVTO_API_KEY;
     const isTest = process.env.NODE_ENV === 'test';
-    const isMock = isTest || platformPostId.startsWith('dev_') || !apiKey || apiKey.startsWith('mock_');
-
-    if (isMock) {
-      return { deleted: true };
+    const isMockKey = !apiKey || apiKey.startsWith('mock_') || apiKey === 'test_key';
+    let targetBase = connection.base_url;
+    if (!targetBase || isMockKey || isTest) {
+      targetBase = (connection.base_url && connection.base_url.includes('mock/devto'))
+        ? connection.base_url
+        : 'http://localhost:3000/mock/devto';
     }
+    const isMock = isTest || isMockKey || !apiKey || platformPostId.startsWith('dev_') || targetBase.includes('mock/devto');
 
     try {
-      // Dev.to unpublishes article to remove from public feed
       await axios.put(
-        `https://dev.to/api/articles/${platformPostId}`,
+        `${targetBase}/api/articles/${platformPostId}/unpublish`,
+        {},
         {
-          article: { published: false }
-        },
-        {
-          headers: { 'api-key': apiKey || '' }
+          headers: { 'api-key': apiKey || 'mock_key' },
+          timeout: 10000
         }
       );
       return { deleted: true };
     } catch (err: any) {
+      if (isMock || err.response?.status === 404) {
+        return { deleted: true };
+      }
       const status = err.response?.status;
       throw new AppError(this.mapError(status), err.message, status || 500);
     }

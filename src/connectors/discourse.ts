@@ -22,15 +22,22 @@ export class DiscourseConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
+    if (idempotencyKey) {
+      const cached = this.checkIdempotency(idempotencyKey);
+      if (cached) return cached;
+    }
+
     const isSimulation = process.env.SIMULATION_MODE === 'true';
 
     if (isSimulation) {
       const mockPostId = `disc_${Date.now()}`;
-      return {
+      const simResult: PublishResult = {
         platform_post_id: mockPostId,
         live_url: `${destination.url || 'https://forum.example.com'}/t/topic/${mockPostId}`,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
+      return simResult;
     }
 
     const baseUrl = connection.base_url || destination.url;
@@ -57,19 +64,23 @@ export class DiscourseConnector extends BaseConnector {
       );
 
       const postId = String(response.data.id);
-      return {
+      const result: PublishResult = {
         platform_post_id: postId,
         live_url: `${baseUrl}/t/${response.data.topic_slug || 'topic'}/${response.data.topic_id}`,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, result);
+      return result;
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         const mockPostId = `disc_${Date.now()}`;
-        return {
+        const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
           live_url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
           status: 'published'
         };
+        if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
+        return fallbackResult;
       }
       const status = err.response?.status;
       const mappedCode = this.mapError(status, 'PLATFORM_UNAVAILABLE');

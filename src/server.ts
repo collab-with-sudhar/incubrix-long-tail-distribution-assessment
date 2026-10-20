@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { connectorRouter } from './routes/connector.v1.js';
 import { apiV1Router } from './routes/api.v1.js';
 import { mockRouter } from './routes/mock.js';
+import { globalTestPostReaper } from './cleanup/reaper.js';
 import { Logger } from './utils/logger.js';
 
 import path from 'path';
@@ -55,6 +56,7 @@ app.use('/mock', mockRouter);
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
+  globalTestPostReaper.start();
   app.listen(PORT, () => {
     Logger.info(`IncuBrix Long-Tail Distribution Connector Service listening on port ${PORT}`, {
       port: PORT,

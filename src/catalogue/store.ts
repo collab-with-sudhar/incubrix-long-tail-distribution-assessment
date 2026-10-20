@@ -35,7 +35,7 @@ export class DestinationCatalogue {
       {
         id: 'dest_lemmy_tech',
         name: 'Lemmy Tech Community',
-        url: 'http://localhost:3000/mock/lemmy',
+        url: 'http://localhost:8536',
         platform_key: 'lemmy',
         surface: 'post',
         category: 'technology',
@@ -54,12 +54,12 @@ export class DestinationCatalogue {
         relevance_reason: 'Direct audience of open source and SaaS builders',
         level: 'L3',
         last_certified_at: new Date().toISOString(),
-        config: { community_id: 1 }
+        config: { community_id: 2 }
       },
       {
         id: 'dest_devto_main',
         name: 'Dev.to Community',
-        url: 'https://dev.to',
+        url: 'http://localhost:3000/mock/devto',
         platform_key: 'devto',
         surface: 'article',
         category: 'developer_blog',
@@ -67,7 +67,7 @@ export class DestinationCatalogue {
         language: 'en',
         geo: 'global',
         est_audience: 1000000,
-        rules_url: 'https://dev.to/terms',
+        rules_url: 'http://localhost:3000/mock/devto/terms',
         frequency_cap: '10/day',
         self_promo_allowed: true,
         link_policy: 'allowed',
@@ -82,7 +82,7 @@ export class DestinationCatalogue {
       {
         id: 'dest_ghost_blog',
         name: 'Ghost Publisher Publication',
-        url: 'http://localhost:3000/mock/ghost',
+        url: 'http://localhost:2368',
         platform_key: 'ghost',
         surface: 'post',
         category: 'blog',

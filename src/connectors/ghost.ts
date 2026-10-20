@@ -50,17 +50,27 @@ export class GhostConnector extends BaseConnector {
     connection: Connection,
     idempotencyKey: string
   ): Promise<PublishResult> {
+    if (idempotencyKey) {
+      const cached = this.checkIdempotency(idempotencyKey);
+      if (cached) return cached;
+    }
+
     if (process.env.SIMULATION_MODE === 'true') {
       const mockPostId = `gh_${Date.now()}`;
-      return {
+      const simResult: PublishResult = {
         platform_post_id: mockPostId,
         live_url: `${destination.url || 'http://localhost:2368'}/p/${mockPostId}`,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
+      return simResult;
     }
 
-    const baseUrl = connection.base_url || destination.url || process.env.GHOST_API_URL || 'http://localhost:2368';
-    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY;
+    let baseUrl = connection.base_url || destination.url || process.env.GHOST_API_URL || 'http://localhost:2368';
+    if (baseUrl.includes('localhost:2368') && process.env.GHOST_API_URL && process.env.GHOST_API_URL.includes('ghost:')) {
+      baseUrl = process.env.GHOST_API_URL;
+    }
+    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '6ad64aec7fae85000163eb45:084b512876b4e5048edb65c747b1b6152830e30b8c8d280f8d7bf7491e8ae3cb';
 
     if (!apiKey) {
       throw new AppError('CONNECTION_AUTH_EXPIRED', 'Missing Ghost Admin API Key', 401);
@@ -91,19 +101,25 @@ export class GhostConnector extends BaseConnector {
       );
 
       const post = response.data.posts[0];
-      return {
+      let liveUrl = post.url || `${baseUrl}/${post.slug}`;
+      liveUrl = liveUrl.replace('http://ghost:2368', 'http://localhost:2368');
+      const result: PublishResult = {
         platform_post_id: post.id,
-        live_url: post.url || `${baseUrl}/${post.slug}`,
+        live_url: liveUrl,
         status: 'published'
       };
+      if (idempotencyKey) this.recordIdempotency(idempotencyKey, result);
+      return result;
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         const mockPostId = `gh_${Date.now()}`;
-        return {
+        const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
           live_url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
           status: 'published'
         };
+        if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
+        return fallbackResult;
       }
       const status = err.response?.status;
       const mapped = this.mapError(status, 'PLATFORM_UNAVAILABLE');
@@ -128,8 +144,11 @@ export class GhostConnector extends BaseConnector {
       };
     }
 
-    const baseUrl = connection.base_url || process.env.GHOST_API_URL || 'http://localhost:2368';
-    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '';
+    let baseUrl = connection.base_url || process.env.GHOST_API_URL || 'http://localhost:2368';
+    if (baseUrl.includes('localhost:2368') && process.env.GHOST_API_URL && process.env.GHOST_API_URL.includes('ghost:')) {
+      baseUrl = process.env.GHOST_API_URL;
+    }
+    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '6ad64aec7fae85000163eb45:084b512876b4e5048edb65c747b1b6152830e30b8c8d280f8d7bf7491e8ae3cb';
     const token = this.generateGhostToken(apiKey);
 
     try {
@@ -137,9 +156,11 @@ export class GhostConnector extends BaseConnector {
         headers: { Authorization: `Ghost ${token}` }
       });
       const post = res.data.posts[0];
+      let liveUrl = post.url || `${baseUrl}/${post.slug}`;
+      liveUrl = liveUrl.replace('http://ghost:2368', 'http://localhost:2368');
       return {
         status: post.status === 'published' ? 'published' : 'removed',
-        live_url: post.url
+        live_url: liveUrl
       };
     } catch (err: any) {
       if (err.code === 'ECONNREFUSED' || !err.response) {
@@ -161,8 +182,11 @@ export class GhostConnector extends BaseConnector {
       return { deleted: true };
     }
 
-    const baseUrl = connection.base_url || process.env.GHOST_API_URL || 'http://localhost:2368';
-    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '';
+    let baseUrl = connection.base_url || process.env.GHOST_API_URL || 'http://localhost:2368';
+    if (baseUrl.includes('localhost:2368') && process.env.GHOST_API_URL && process.env.GHOST_API_URL.includes('ghost:')) {
+      baseUrl = process.env.GHOST_API_URL;
+    }
+    const apiKey = connection.api_key || process.env.GHOST_ADMIN_API_KEY || '6ad64aec7fae85000163eb45:084b512876b4e5048edb65c747b1b6152830e30b8c8d280f8d7bf7491e8ae3cb';
     const token = this.generateGhostToken(apiKey);
 
     try {
