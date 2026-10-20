@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:frontend": "cd frontend && npm run dev",
-    "build:frontend": "cd frontend && npm run build",
-    "build": "tsc && npm run build:frontend",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.cpSync('src/manifests', 'dist/manifests', {recursive:true});\"",
+    "build:all": "npm run build:frontend && npm run build",
     "start": "node dist/server.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:contract": "jest tests/contract --runInBand",
