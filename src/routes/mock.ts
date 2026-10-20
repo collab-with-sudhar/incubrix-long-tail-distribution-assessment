@@ -852,3 +852,279 @@ mockRouter.post('/slack/api/chat.postMessage', (req: Request, res: Response) => 
     }
   });
 });
+
+/**
+ * Assisted Tier Mock Submission Portal (Must-Have 2)
+ * Interactive human operator portal for moderated communities where automated posting is forbidden
+ */
+mockRouter.get(['/assisted/submit', '/assisted'], (req: Request, res: Response) => {
+  const packId = req.query.pack_id as string || 'assist_demo';
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Indie Hackers Moderated Community — Human Submission Portal | IncuBrix Assisted Tier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #F7FAF8;
+      --bg-surface: #FFFFFF;
+      --border-hairline: #E1EAE3;
+      --border-subtle: #D2DFD5;
+      --green-primary: #245E3D;
+      --green-light: #EAF5EE;
+      --green-border: #BCDDC7;
+      --text-main: #141C16;
+      --text-secondary: #4F5E53;
+      --text-muted: #7A8B7F;
+      --amber-bg: #FEF7E0;
+      --amber-text: #B06000;
+      --amber-border: #FEEFC3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Google Sans Text', 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      padding: 32px 16px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      background-color: #E37400;
+      border-radius: 50%;
+    }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      margin-bottom: 20px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--amber-bg);
+      color: var(--amber-text);
+      border: 1px solid var(--amber-border);
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-main);
+    }
+    p.lead {
+      color: var(--text-secondary);
+      font-size: 14.5px;
+      margin-bottom: 24px;
+    }
+    .section-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .checklist {
+      list-style: none;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #FAFCFA;
+      border: 1px solid var(--border-hairline);
+      border-radius: 8px;
+      font-size: 13.5px;
+    }
+    .check-icon {
+      color: #1E8E3E;
+      font-weight: bold;
+    }
+    .payload-box {
+      background: #F8F9FA;
+      border: 1px solid #DADCE0;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 20px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--green-primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #1C4D32;
+    }
+    .btn-outline {
+      background: #fff;
+      border-color: var(--border-subtle);
+      color: var(--text-main);
+    }
+    .btn-outline:hover {
+      background: #F1F5F2;
+    }
+    .success-alert {
+      display: none;
+      padding: 14px 18px;
+      background: var(--green-light);
+      border: 1px solid var(--green-border);
+      border-radius: 8px;
+      color: var(--green-primary);
+      font-weight: 500;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar">
+      <a href="/" class="brand">
+        <span class="brand-dot"></span>
+        <span>IncuBrix Assisted Distribution</span>
+      </a>
+      <span style="font-size: 12.5px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+        Pack ID: ${escapeHtml(packId)}
+      </span>
+    </div>
+
+    <div class="card">
+      <div class="badge">
+        <span>✋ Manual Human Submission Tier (Appendix A)</span>
+      </div>
+      <h1>Strict Moderated Indie Hackers Community</h1>
+      <p class="lead">
+        This community forbids automated bots and requires human-in-the-loop review. IncuBrix has prepared this complete Assist Pack with formatted caption, pre-checked rules, and deep links so a human operator can submit safely.
+      </p>
+
+      <div class="section-title">Community Compliance Checklist</div>
+      <ul class="checklist">
+        <li class="checklist-item"><span class="check-icon">✓</span> Destination target: Strict Moderated Indie Hackers Community</li>
+        <li class="checklist-item"><span class="check-icon">✓</span> Non-promotional framing: Direct marketing pitch removed</li>
+        <li class="checklist-item"><span class="check-icon">✓</span> AI Attribution disclosure statement appended to post text</li>
+        <li class="checklist-item"><span class="check-icon">✓</span> Link policy verified: Outbound links placed in first comment only</li>
+      </ul>
+
+      <div class="section-title">Prepared Content Payload</div>
+      <div class="payload-box" id="payloadText">Building Resilient Distribution Connectors with TypeScript
+
+Technical overview of contract-compliant connectors, backoff retry strategies, and idempotency guarantees.
+
+(Note: This content was formatted and packaged by IncuBrix Assisted Tier for manual human submission.)
+
+Link: https://incubrix.com/distribution-architecture</div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="confirmSubmission()">✓ Mark Human Submission Complete</button>
+        <button class="btn btn-outline" onclick="copyPayload()">📋 Copy Formatted Text</button>
+        <a href="/mock/assisted/guidelines" class="btn btn-outline" target="_blank">📖 View Community Guidelines</a>
+      </div>
+
+      <div class="success-alert" id="successBox">
+        ✓ Post marked as submitted by human operator! Status updated to confirmed.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function copyPayload() {
+      const text = document.getElementById('payloadText').innerText;
+      navigator.clipboard.writeText(text);
+      alert('Copied Assist Pack text to clipboard!');
+    }
+    function confirmSubmission() {
+      document.getElementById('successBox').style.display = 'block';
+    }
+  </script>
+</body>
+</html>`;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(html);
+});
+
+mockRouter.get('/assisted/guidelines', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(renderHtmlPreview({
+    badge: 'COMMUNITY GUIDELINES',
+    platform: 'Indie Hackers Moderated Community',
+    title: 'Submission Guidelines & Code of Conduct',
+    bodyHtml: `
+      <h2>1. No Automated Bot Posting</h2>
+      <p>All posts must be submitted by a human creator. Automated posting scripts and syndication bots are strictly banned.</p>
+      <h2>2. Value-First Discussion</h2>
+      <p>Direct advertising and marketing pitches are prohibited. Frame content as lessons learned or discussion topics.</p>
+      <h2>3. AI Disclosure</h2>
+      <p>Posts created with AI assistance must include an explicit disclosure statement.</p>
+      <h2>4. Links Policy</h2>
+      <p>Do not place promotional links in the main post body. Add reference links in the first comment only.</p>
+    `,
+    postId: 'guidelines',
+    urlPath: '/mock/assisted/guidelines',
+    timestamp: new Date().toISOString()
+  }));
+});
+

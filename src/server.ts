@@ -27,13 +27,15 @@ app.use(idempotencyMiddleware());
 app.use(express.static(path.resolve(process.cwd(), 'public')));
 
 // Health & Readiness Endpoints (Integration Standard 8)
-app.get('/health', (req, res) => {
+const healthHandler = (req: express.Request, res: express.Response) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime_seconds: process.uptime()
   });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/v1/health', healthHandler);
 
 app.get('/ready', (req, res) => {
   res.status(200).json({

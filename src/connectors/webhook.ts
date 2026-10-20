@@ -35,7 +35,7 @@ export class WebhookConnector extends BaseConnector {
       const mockId = `wh_${Date.now()}`;
       const simResult: PublishResult = {
         platform_post_id: mockId,
-        live_url: `${destination.url || 'https://partner.example.com/webhook'}/event/${mockId}`,
+        live_url: `${destination.url || 'http://localhost:3000/mock/webhook/incoming'}/event/${mockId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
@@ -106,7 +106,7 @@ export class WebhookConnector extends BaseConnector {
   ): Promise<GetStatusResult> {
     return {
       status: 'published',
-      live_url: `${connection.base_url || 'https://partner.example.com'}/event/${platformPostId}`
+      live_url: `${connection.base_url || 'http://localhost:3000/mock/webhook/incoming'}/event/${platformPostId}`
     };
   }
 

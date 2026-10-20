@@ -33,7 +33,7 @@ export class DiscourseConnector extends BaseConnector {
       const mockPostId = `disc_${Date.now()}`;
       const simResult: PublishResult = {
         platform_post_id: mockPostId,
-        live_url: `${destination.url || 'https://forum.example.com'}/t/topic/${mockPostId}`,
+        live_url: `${destination.url || 'http://localhost:3000/mock/discourse'}/t/topic/${mockPostId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);

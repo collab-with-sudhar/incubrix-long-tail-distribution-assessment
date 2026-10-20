@@ -127,7 +127,7 @@ export class DestinationCatalogue {
       {
         id: 'dest_assisted_forum',
         name: 'Strict Moderated Indie Hackers Community',
-        url: 'https://example.com/indie-hackers/submit',
+        url: 'http://localhost:3000/mock/assisted/submit',
         platform_key: 'assisted',
         surface: 'manual_pack',
         category: 'founders',
@@ -135,7 +135,7 @@ export class DestinationCatalogue {
         language: 'en',
         geo: 'global',
         est_audience: 75000,
-        rules_url: 'https://example.com/rules',
+        rules_url: 'http://localhost:3000/mock/assisted/guidelines',
         frequency_cap: '10/day',
         self_promo_allowed: false,
         link_policy: 'first_comment',

@@ -42,7 +42,7 @@ export class AssistedConnector extends BaseConnector {
       'Review formatting and submit manually'
     ];
 
-    const deepLink = destination.url || 'https://example.com/submit';
+    const deepLink = destination.url || 'http://localhost:3000/mock/assisted/submit';
 
     return {
       files,
@@ -74,7 +74,7 @@ export class AssistedConnector extends BaseConnector {
   ): Promise<GetStatusResult> {
     return {
       status: 'pending',
-      live_url: `https://example.com/assist/${platformPostId}`
+      live_url: `http://localhost:3000/mock/assisted/submit?id=${platformPostId}`
     };
   }
 
