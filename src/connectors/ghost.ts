@@ -124,7 +124,7 @@ export class GhostConnector extends BaseConnector {
         body: fullHtml,
         platform: 'Ghost Publisher',
         createdAt: new Date().toISOString(),
-        url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
+        url: `/mock/ghost/p/${mockPostId}`,
         status: 'published',
         tags: rendition.tags || ['creators', 'marketing', 'video'],
         score: '4 / 5',
@@ -132,7 +132,7 @@ export class GhostConnector extends BaseConnector {
       });
       const fallbackResult: PublishResult = {
         platform_post_id: mockPostId,
-        live_url: `http://localhost:3000/mock/ghost/p/${mockPostId}`,
+        live_url: `/mock/ghost/p/${mockPostId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
@@ -147,7 +147,7 @@ export class GhostConnector extends BaseConnector {
     if (platformPostId.startsWith('gh_')) {
       return {
         status: 'published',
-        live_url: `http://localhost:3000/mock/ghost/p/${platformPostId}`
+        live_url: `/mock/ghost/p/${platformPostId}`
       };
     }
 
@@ -173,7 +173,7 @@ export class GhostConnector extends BaseConnector {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         return {
           status: 'published',
-          live_url: `http://localhost:3000/mock/ghost/p/${platformPostId}`
+          live_url: `/mock/ghost/p/${platformPostId}`
         };
       }
       const status = err.response?.status;

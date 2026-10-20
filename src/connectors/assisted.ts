@@ -43,7 +43,7 @@ export class AssistedConnector extends BaseConnector {
       'Review formatting and submit manually'
     ];
 
-    const deepLink = destination.url || 'http://localhost:3000/mock/assisted/submit';
+    const deepLink = destination.url || '/mock/assisted/submit';
 
     return {
       files,
@@ -61,7 +61,7 @@ export class AssistedConnector extends BaseConnector {
   ): Promise<PublishResult> {
     const pack = await this.buildAssistPack(rendition, destination);
     const packId = `assist_${Date.now()}`;
-    const liveUrl = `http://localhost:3000/mock/assisted/submit?pack_id=${packId}`;
+    const liveUrl = `/mock/assisted/submit?pack_id=${packId}`;
     saveMockPost({
       id: packId,
       title: rendition.title || 'Indie Hackers Founder Discussion',
@@ -88,7 +88,7 @@ export class AssistedConnector extends BaseConnector {
   ): Promise<GetStatusResult> {
     return {
       status: 'pending',
-      live_url: `http://localhost:3000/mock/assisted/submit?id=${platformPostId}`
+      live_url: `/mock/assisted/submit?id=${platformPostId}`
     };
   }
 

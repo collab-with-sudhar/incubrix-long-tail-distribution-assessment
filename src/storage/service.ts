@@ -19,7 +19,7 @@ export class StorageService {
 
   constructor() {
     this.localDir = process.env.STORAGE_LOCAL_DIR || path.resolve(process.cwd(), 'data', 'storage');
-    this.baseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
+    this.baseUrl = process.env.PUBLIC_BASE_URL ? process.env.PUBLIC_BASE_URL.replace(/\/+$/, '') : '';
 
     if (!fs.existsSync(this.localDir)) {
       fs.mkdirSync(this.localDir, { recursive: true });

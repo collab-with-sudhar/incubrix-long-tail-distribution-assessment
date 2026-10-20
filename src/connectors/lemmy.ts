@@ -130,7 +130,7 @@ export class LemmyConnector extends BaseConnector {
         body: bodyText,
         platform: 'Lemmy Community',
         createdAt: new Date().toISOString(),
-        url: `http://localhost:3000/mock/lemmy/post/${mockPostId}`,
+        url: `/mock/lemmy/post/${mockPostId}`,
         status: 'published',
         tags: rendition.tags || ['open-source', 'founders', 'ai'],
         score: '5 / 5',
@@ -138,7 +138,7 @@ export class LemmyConnector extends BaseConnector {
       });
       const fallbackResult: PublishResult = {
         platform_post_id: mockPostId,
-        live_url: `http://localhost:3000/mock/lemmy/post/${mockPostId}`,
+        live_url: `/mock/lemmy/post/${mockPostId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
@@ -153,7 +153,7 @@ export class LemmyConnector extends BaseConnector {
     if (process.env.SIMULATION_MODE === 'true' || !/^\d+$/.test(platformPostId)) {
       return {
         status: 'published',
-        live_url: `http://localhost:3000/mock/lemmy/post/${platformPostId}`
+        live_url: `/mock/lemmy/post/${platformPostId}`
       };
     }
 
@@ -179,7 +179,7 @@ export class LemmyConnector extends BaseConnector {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         return {
           status: 'published',
-          live_url: `http://localhost:3000/mock/lemmy/post/${platformPostId}`
+          live_url: `/mock/lemmy/post/${platformPostId}`
         };
       }
       const status = err.response?.status;

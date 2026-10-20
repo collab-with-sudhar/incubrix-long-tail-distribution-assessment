@@ -5,6 +5,7 @@ interface Destination {
   id: string;
   name: string;
   url: string;
+  rules_url?: string;
   platform_key: string;
   connector_key: string;
   surface: string;
@@ -1170,7 +1171,7 @@ export function App() {
                               rel="noreferrer"
                               style={{ color: 'var(--green-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
                             >
-                              📎 {f.original_name} ({(f.size_bytes / 1024).toFixed(1)} KB) ⬇️ Download
+                              📎 {f.original_name} ({(f.size_bytes / 1024).toFixed(1)} KB) 👁️ View / Download
                             </a>
                           ))}
                         </div>
@@ -1393,7 +1394,18 @@ export function App() {
                       <div className="dest-entry-title">{d.name}</div>
                       <span className="badge-tag native">{d.platform_key}</span>
                     </div>
-                    <div className="dest-entry-sub">{d.url}</div>
+                    <div className="dest-entry-sub">
+                      <a href={d.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        {d.url}
+                      </a>
+                      {d.rules_url && (
+                        <span style={{ marginLeft: '8px' }}>
+                          • <a href={d.rules_url} target="_blank" rel="noreferrer" style={{ color: '#245E3D', textDecoration: 'none', fontWeight: 500 }}>
+                            📜 Rules
+                          </a>
+                        </span>
+                      )}
+                    </div>
                     <div className="dest-entry-specs">
                       <div className="kv-row">
                         <span className="kv-key">Surface</span>
@@ -1482,7 +1494,7 @@ export function App() {
                   <input
                     type="url"
                     className="text-input"
-                    placeholder="https://example.com/asset.png or http://localhost:3000/health"
+                    placeholder="https://example.com/asset.png or /health"
                     value={remoteUrlInput}
                     onChange={(e) => setRemoteUrlInput(e.target.value)}
                   />
@@ -1561,7 +1573,7 @@ export function App() {
                           className="action-btn outline small"
                           style={{ textDecoration: 'none', color: '#245E3D' }}
                         >
-                          ⬇️ Download
+                          👁️ View / Download
                         </a>
                         <button
                           className="action-btn primary small"

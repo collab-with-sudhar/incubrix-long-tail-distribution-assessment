@@ -34,10 +34,13 @@ export class DevtoConnector extends BaseConnector {
     const isSimulation = process.env.SIMULATION_MODE === 'true';
 
     let targetBase = connection.base_url || destination.url || 'https://dev.to';
-    const useLocalMock = isTest || isMockKey || !apiKey || targetBase.includes('mock/devto') || isSimulation;
+    const useLocalMock = isTest || isMockKey || !apiKey || targetBase.includes('mock/devto') || targetBase.startsWith('/') || isSimulation;
+    const localPort = process.env.PORT || 3000;
 
     if (useLocalMock) {
-      targetBase = 'http://localhost:3000/mock/devto';
+      targetBase = `http://127.0.0.1:${localPort}/mock/devto`;
+    } else if (targetBase.startsWith('/')) {
+      targetBase = `http://127.0.0.1:${localPort}${targetBase}`;
     }
 
     try {
@@ -98,7 +101,7 @@ export class DevtoConnector extends BaseConnector {
           body: rendition.body || '',
           platform: 'Dev.to Developer Blog',
           createdAt: new Date().toISOString(),
-          url: `http://localhost:3000/mock/devto/article/${mockPostId}`,
+          url: `/mock/devto/article/${mockPostId}`,
           status: 'published',
           tags: rendition.tags || ['developers', 'ai', 'saas'],
           score: '5 / 5',
@@ -106,7 +109,7 @@ export class DevtoConnector extends BaseConnector {
         });
         const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
-          live_url: `http://localhost:3000/mock/devto/article/${mockPostId}`,
+          live_url: `/mock/devto/article/${mockPostId}`,
           status: 'published'
         };
         if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
@@ -131,11 +134,15 @@ export class DevtoConnector extends BaseConnector {
     const apiKey = connection.api_key || process.env.DEVTO_API_KEY;
     const isTest = process.env.NODE_ENV === 'test';
     const isMockKey = !apiKey || apiKey.startsWith('mock_') || apiKey === 'test_key';
+    const localPort = process.env.PORT || 3000;
     let targetBase = connection.base_url;
     if (!targetBase || isMockKey || isTest) {
       targetBase = (connection.base_url && connection.base_url.includes('mock/devto'))
         ? connection.base_url
-        : 'http://localhost:3000/mock/devto';
+        : `http://127.0.0.1:${localPort}/mock/devto`;
+    }
+    if (targetBase.startsWith('/')) {
+      targetBase = `http://127.0.0.1:${localPort}${targetBase}`;
     }
     const isMock = isTest || isMockKey || !apiKey || platformPostId.startsWith('dev_') || targetBase.includes('mock/devto');
 
@@ -145,13 +152,13 @@ export class DevtoConnector extends BaseConnector {
       });
       return {
         status: res.data && res.data.published !== false ? 'published' : 'removed',
-        live_url: res.data?.url || `http://localhost:3000/mock/devto/article/${platformPostId}`
+        live_url: res.data?.url || `/mock/devto/article/${platformPostId}`
       };
     } catch (err: any) {
       if (isMock || err.response?.status === 404) {
         return {
           status: 'published',
-          live_url: `http://localhost:3000/mock/devto/article/${platformPostId}`
+          live_url: `/mock/devto/article/${platformPostId}`
         };
       }
       const status = err.response?.status;
@@ -166,11 +173,15 @@ export class DevtoConnector extends BaseConnector {
     const apiKey = connection.api_key || process.env.DEVTO_API_KEY;
     const isTest = process.env.NODE_ENV === 'test';
     const isMockKey = !apiKey || apiKey.startsWith('mock_') || apiKey === 'test_key';
+    const localPort = process.env.PORT || 3000;
     let targetBase = connection.base_url;
     if (!targetBase || isMockKey || isTest) {
       targetBase = (connection.base_url && connection.base_url.includes('mock/devto'))
         ? connection.base_url
-        : 'http://localhost:3000/mock/devto';
+        : `http://127.0.0.1:${localPort}/mock/devto`;
+    }
+    if (targetBase.startsWith('/')) {
+      targetBase = `http://127.0.0.1:${localPort}${targetBase}`;
     }
     const isMock = isTest || isMockKey || !apiKey || platformPostId.startsWith('dev_') || targetBase.includes('mock/devto');
 

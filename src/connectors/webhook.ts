@@ -40,7 +40,7 @@ export class WebhookConnector extends BaseConnector {
         body: JSON.stringify({ event: 'content.publish', rendition, timestamp: new Date().toISOString() }, null, 2),
         platform: 'Partner Webhook',
         createdAt: new Date().toISOString(),
-        url: `http://localhost:3000/mock/webhook/events/${mockId}`,
+        url: `/mock/webhook/events/${mockId}`,
         status: 'delivered',
         tags: rendition.tags || ['saas', 'distribution'],
         score: '4 / 5',
@@ -48,7 +48,7 @@ export class WebhookConnector extends BaseConnector {
       });
       const simResult: PublishResult = {
         platform_post_id: mockId,
-        live_url: `http://localhost:3000/mock/webhook/events/${mockId}`,
+        live_url: `/mock/webhook/events/${mockId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
@@ -58,6 +58,11 @@ export class WebhookConnector extends BaseConnector {
     const targetUrl = connection.base_url || destination.url;
     if (!targetUrl) {
       throw new AppError('DEST_SPEC_VIOLATION', 'Missing target webhook URL for partner destination', 400);
+    }
+    const localPort = process.env.PORT || 3000;
+    let requestTarget = targetUrl;
+    if (requestTarget.startsWith('/')) {
+      requestTarget = `http://127.0.0.1:${localPort}${requestTarget}`;
     }
 
     const secret = connection.secret || process.env.WEBHOOK_HMAC_SECRET || 'incubrix_default_secret';
@@ -72,7 +77,7 @@ export class WebhookConnector extends BaseConnector {
     const signature = this.generateSignature(payload, secret);
 
     try {
-      const response = await axios.post(targetUrl, payload, {
+      const response = await axios.post(requestTarget, payload, {
         headers: {
           'Content-Type': 'application/json',
           'X-IncuBrix-Signature': signature,
@@ -82,7 +87,7 @@ export class WebhookConnector extends BaseConnector {
       });
 
       const postId = response.data?.platform_post_id || response.data?.id || `wh_${Date.now()}`;
-      const liveUrl = response.data?.live_url || `http://localhost:3000/mock/webhook/events/${postId}`;
+      const liveUrl = response.data?.live_url || `/mock/webhook/events/${postId}`;
       const result: PublishResult = {
         platform_post_id: String(postId),
         live_url: liveUrl,
@@ -99,7 +104,7 @@ export class WebhookConnector extends BaseConnector {
           body: JSON.stringify({ event: 'content.publish', rendition, timestamp: new Date().toISOString() }, null, 2),
           platform: 'Partner Webhook',
           createdAt: new Date().toISOString(),
-          url: `http://localhost:3000/mock/webhook/events/${postId}`,
+          url: `/mock/webhook/events/${postId}`,
           status: 'delivered',
           tags: rendition.tags || ['saas', 'distribution'],
           score: '4 / 5',
@@ -107,7 +112,7 @@ export class WebhookConnector extends BaseConnector {
         });
         const fallbackResult: PublishResult = {
           platform_post_id: postId,
-          live_url: `http://localhost:3000/mock/webhook/events/${postId}`,
+          live_url: `/mock/webhook/events/${postId}`,
           status: 'published'
         };
         if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
@@ -131,7 +136,7 @@ export class WebhookConnector extends BaseConnector {
   ): Promise<GetStatusResult> {
     return {
       status: 'published',
-      live_url: `${connection.base_url || 'http://localhost:3000/mock/webhook/incoming'}/event/${platformPostId}`
+      live_url: `/mock/webhook/events/${platformPostId}`
     };
   }
 

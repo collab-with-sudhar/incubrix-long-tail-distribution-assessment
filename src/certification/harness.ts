@@ -34,7 +34,7 @@ export class CertificationHarness {
       globalCatalogue.list().find((d) => d.connector_key === connectorKey) || {
         id: `dest_${connectorKey}_test`,
         name: `Test Destination for ${connectorKey}`,
-        url: 'http://localhost:3000/mock',
+        url: '/mock',
         platform_key: connectorKey,
         surface: connector.manifest.surfaces[0]?.key || 'topic',
         connector_key: connectorKey

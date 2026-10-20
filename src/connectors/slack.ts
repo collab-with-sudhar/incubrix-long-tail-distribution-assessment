@@ -29,7 +29,7 @@ export class SlackConnector extends BaseConnector {
       const mockMsgId = `slk_${Date.now()}`;
       return {
         platform_post_id: mockMsgId,
-        live_url: `http://localhost:3000/mock/slack/messages/${mockMsgId}`,
+        live_url: `/mock/slack/messages/${mockMsgId}`,
         status: 'published'
       };
     }

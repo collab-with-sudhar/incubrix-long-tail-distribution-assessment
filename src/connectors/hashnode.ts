@@ -29,7 +29,7 @@ export class HashnodeConnector extends BaseConnector {
       const mockPostId = `hn_${Date.now()}`;
       return {
         platform_post_id: mockPostId,
-        live_url: `http://localhost:3000/mock/hashnode/p/${mockPostId}`,
+        live_url: `/mock/hashnode/p/${mockPostId}`,
         status: 'published'
       };
     }

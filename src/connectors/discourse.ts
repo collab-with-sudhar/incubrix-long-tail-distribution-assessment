@@ -49,7 +49,7 @@ export class DiscourseConnector extends BaseConnector {
         body: rawBody,
         platform: 'Discourse Forum',
         createdAt: new Date().toISOString(),
-        url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
+        url: `/mock/discourse/t/topic/${mockPostId}`,
         status: 'published',
         tags: rendition.tags || ['saas', 'developers', 'community'],
         score: '4 / 5',
@@ -57,7 +57,7 @@ export class DiscourseConnector extends BaseConnector {
       });
       const simResult: PublishResult = {
         platform_post_id: mockPostId,
-        live_url: `${destination.url || 'http://localhost:3000/mock/discourse'}/t/topic/${mockPostId}`,
+        live_url: `${destination.url || '/mock/discourse'}/t/topic/${mockPostId}`,
         status: 'published'
       };
       if (idempotencyKey) this.recordIdempotency(idempotencyKey, simResult);
@@ -68,10 +68,15 @@ export class DiscourseConnector extends BaseConnector {
     if (!baseUrl) {
       throw new AppError('DEST_SPEC_VIOLATION', 'Missing base URL for Discourse instance', 400);
     }
+    const localPort = process.env.PORT || 3000;
+    let requestBase = baseUrl;
+    if (requestBase.startsWith('/')) {
+      requestBase = `http://127.0.0.1:${localPort}${requestBase}`;
+    }
 
     try {
       const response = await axios.post(
-        `${baseUrl}/posts.json`,
+        `${requestBase}/posts.json`,
         {
           title: rendition.title || 'Discussion Topic',
           raw: rawBody,
@@ -104,7 +109,7 @@ export class DiscourseConnector extends BaseConnector {
           body: rawBody,
           platform: 'Discourse Forum',
           createdAt: new Date().toISOString(),
-          url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
+          url: `/mock/discourse/t/topic/${mockPostId}`,
           status: 'published',
           tags: rendition.tags || ['saas', 'developers', 'community'],
           score: '4 / 5',
@@ -112,7 +117,7 @@ export class DiscourseConnector extends BaseConnector {
         });
         const fallbackResult: PublishResult = {
           platform_post_id: mockPostId,
-          live_url: `http://localhost:3000/mock/discourse/t/topic/${mockPostId}`,
+          live_url: `/mock/discourse/t/topic/${mockPostId}`,
           status: 'published'
         };
         if (idempotencyKey) this.recordIdempotency(idempotencyKey, fallbackResult);
@@ -137,13 +142,19 @@ export class DiscourseConnector extends BaseConnector {
     if (process.env.SIMULATION_MODE === 'true' || platformPostId.startsWith('disc_')) {
       return {
         status: 'published',
-        live_url: `http://localhost:3000/mock/discourse/t/topic/${platformPostId}`
+        live_url: `/mock/discourse/t/topic/${platformPostId}`
       };
     }
 
-    const baseUrl = connection.base_url || 'http://localhost:3000/mock/discourse';
+    const baseUrl = connection.base_url || '/mock/discourse';
+    const localPort = process.env.PORT || 3000;
+    let requestBase = baseUrl;
+    if (requestBase.startsWith('/')) {
+      requestBase = `http://127.0.0.1:${localPort}${requestBase}`;
+    }
+
     try {
-      const res = await axios.get(`${baseUrl}/posts/${platformPostId}.json`, {
+      const res = await axios.get(`${requestBase}/posts/${platformPostId}.json`, {
         headers: {
           'Api-Key': connection.api_key || '',
           'Api-Username': connection.username || 'system'
@@ -158,7 +169,7 @@ export class DiscourseConnector extends BaseConnector {
       if (err.code === 'ECONNREFUSED' || !err.response) {
         return {
           status: 'published',
-          live_url: `http://localhost:3000/mock/discourse/t/topic/${platformPostId}`
+          live_url: `/mock/discourse/t/topic/${platformPostId}`
         };
       }
       const status = err.response?.status;
@@ -174,9 +185,15 @@ export class DiscourseConnector extends BaseConnector {
       return { deleted: true };
     }
 
-    const baseUrl = connection.base_url || 'http://localhost:3000/mock/discourse';
+    const baseUrl = connection.base_url || '/mock/discourse';
+    const localPort = process.env.PORT || 3000;
+    let requestBase = baseUrl;
+    if (requestBase.startsWith('/')) {
+      requestBase = `http://127.0.0.1:${localPort}${requestBase}`;
+    }
+
     try {
-      await axios.delete(`${baseUrl}/posts/${platformPostId}.json`, {
+      await axios.delete(`${requestBase}/posts/${platformPostId}.json`, {
         headers: {
           'Api-Key': connection.api_key || '',
           'Api-Username': connection.username || 'system'

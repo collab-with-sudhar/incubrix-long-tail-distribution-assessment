@@ -271,7 +271,7 @@ function renderHtmlPreview(opts: {
 <body>
   <div class="container">
     <div class="top-bar">
-      <a href="http://localhost:3000" class="brand">
+      <a href="/" class="brand">
         <span class="brand-dot"></span>
         IncuBrix Distribution Network
       </a>
@@ -351,7 +351,7 @@ function renderHtmlPreview(opts: {
         <span style="font-size: 13px; color: var(--text-muted);">
           IncuBrix Certified Destination • Appendix A Contract
         </span>
-        <a href="http://localhost:3000" class="btn-return">
+        <a href="/" class="btn-return">
           ← Back to Console
         </a>
       </div>
@@ -377,7 +377,7 @@ mockRouter.post('/discourse/posts.json', (req: Request, res: Response) => {
     body: raw,
     platform: 'Discourse Forum',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/discourse/t/${topicSlug}/${id}`,
+    url: `/mock/discourse/t/${topicSlug}/${id}`,
     status: 'published',
     tags: ['saas', 'developers', 'community'],
     score: '4 / 5'
@@ -449,7 +449,7 @@ mockRouter.get('/discourse/guidelines', (req: Request, res: Response) => {
     title: 'Discourse Community Posting Guidelines',
     bodyHtml: `<h3>Posting Rules & Policy:</h3>
       <ul>
-        <li><strong>Frequency Cap:</strong> Maximum 10 posts per day.</li>
+        <li><strong>Frequency Cap:</strong> Maximum 3 posts per day.</li>
         <li><strong>Self-Promotion:</strong> Strictly prohibited. Focus on community value and constructive discussions.</li>
         <li><strong>Links:</strong> Allowed with context. No link spamming.</li>
         <li><strong>AI Disclosure:</strong> AI-generated content must be explicitly disclosed.</li>
@@ -474,7 +474,7 @@ mockRouter.post('/ghost/ghost/api/admin/posts', (req: Request, res: Response) =>
     body: postData.html || '<p>Published via IncuBrix Long-Tail Distribution Network.</p>',
     platform: 'Ghost Publisher',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/ghost/p/${slug}`,
+    url: `/mock/ghost/p/${slug}`,
     status: 'published',
     tags: ['creators', 'marketing', 'video'],
     score: '4 / 5'
@@ -502,7 +502,7 @@ mockRouter.get('/ghost/ghost/api/admin/posts/:id', (req: Request, res: Response)
       {
         id: req.params.id,
         status: 'published',
-        url: `http://localhost:3000/mock/ghost/p/${req.params.id}`,
+        url: `/mock/ghost/p/${req.params.id}`,
         page_views_count: 310
       }
     ]
@@ -558,7 +558,7 @@ mockRouter.get('/ghost/about', (req: Request, res: Response) => {
     title: 'About Ghost Publisher Publication',
     bodyHtml: `<h3>Publication Policy:</h3>
       <ul>
-        <li><strong>Frequency Cap:</strong> Maximum 10 articles per day.</li>
+        <li><strong>Frequency Cap:</strong> Maximum 3 articles per day.</li>
         <li><strong>Self-Promotion:</strong> Allowed with editorial relevance.</li>
         <li><strong>Links:</strong> Canonical links and references encouraged.</li>
         <li><strong>AI Content:</strong> High quality standards expected.</li>
@@ -589,7 +589,7 @@ mockRouter.post('/lemmy/api/v3/post', (req: Request, res: Response) => {
     body,
     platform: 'Lemmy Federation',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/lemmy/post/${id}`,
+    url: `/mock/lemmy/post/${id}`,
     status: 'published',
     tags: ['open-source', 'founders', 'ai'],
     score: '5 / 5'
@@ -604,7 +604,7 @@ mockRouter.post('/lemmy/api/v3/post', (req: Request, res: Response) => {
         id,
         name,
         body,
-        ap_id: `http://localhost:3000/mock/lemmy/post/${id}`
+        ap_id: `/mock/lemmy/post/${id}`
       }
     }
   });
@@ -676,7 +676,7 @@ mockRouter.get('/lemmy/rules', (req: Request, res: Response) => {
     title: 'Lemmy Community Rules & Policies',
     bodyHtml: `<h3>Community Rules:</h3>
       <ul>
-        <li><strong>Frequency Cap:</strong> Maximum 10 posts per day.</li>
+        <li><strong>Frequency Cap:</strong> Maximum 3 posts per day.</li>
         <li><strong>Self-Promotion:</strong> Permitted for open-source and developer tooling with transparent disclosure.</li>
         <li><strong>Links:</strong> Allowed to original repositories and documentation.</li>
         <li><strong>Conduct:</strong> Be respectful and supportive of builders.</li>
@@ -704,7 +704,7 @@ mockRouter.post('/webhook/incoming', (req: Request, res: Response) => {
     body,
     platform: 'Partner Webhook',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/webhook/events/${eventId}`,
+    url: `/mock/webhook/events/${eventId}`,
     status: 'delivered',
     tags: ['saas', 'distribution'],
     score: '4 / 5',
@@ -717,7 +717,7 @@ mockRouter.post('/webhook/incoming', (req: Request, res: Response) => {
     received: true,
     id: eventId,
     platform_post_id: eventId,
-    live_url: `http://localhost:3000/mock/webhook/events/${eventId}`,
+    live_url: `/mock/webhook/events/${eventId}`,
     timestamp: record.createdAt
   });
 });
@@ -769,7 +769,7 @@ mockRouter.post('/hashnode/graphql', (req: Request, res: Response) => {
     body: '<p>Article published to Hashnode developer network via GraphQL endpoint.</p>',
     platform: 'Hashnode Developer Blog',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/hashnode/p/${id}`,
+    url: `/mock/hashnode/p/${id}`,
     status: 'published',
     tags: ['developers', 'engineering', 'saas'],
     score: '4 / 5'
@@ -831,7 +831,7 @@ mockRouter.post('/devto/api/articles', (req: Request, res: Response) => {
     body: article.body_markdown || '<p>Published via IncuBrix Distribution Network.</p>',
     platform: 'Dev.to Developer Blog',
     createdAt: new Date().toISOString(),
-    url: `http://localhost:3000/mock/devto/article/${id}`,
+    url: `/mock/devto/article/${id}`,
     status: 'published',
     tags: article.tags || ['developers', 'ai', 'saas'],
     score: '5 / 5'
@@ -919,7 +919,7 @@ mockRouter.get('/devto/terms', (req: Request, res: Response) => {
     title: 'Dev.to Terms of Use & Community Guidelines',
     bodyHtml: `<h3>Developer Publishing Guidelines:</h3>
       <ul>
-        <li><strong>Frequency Cap:</strong> Maximum 10 posts per day.</li>
+        <li><strong>Frequency Cap:</strong> Maximum 3 posts per day.</li>
         <li><strong>Self-Promotion:</strong> Permitted with genuine technical value.</li>
         <li><strong>AI Disclosure:</strong> Explicit disclosure required for generated articles.</li>
         <li><strong>Code Standards:</strong> Provide clear formatting and respectful discourse.</li>
