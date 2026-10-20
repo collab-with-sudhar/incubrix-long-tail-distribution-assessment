@@ -37,7 +37,7 @@ const healthHandler = (req: express.Request, res: express.Response) => {
 app.get('/health', healthHandler);
 app.get('/api/v1/health', healthHandler);
 
-app.get('/ready', (req, res) => {
+app.get('/ready', (req: express.Request, res: express.Response) => {
   res.status(200).json({
     status: 'ready',
     simulation_mode: process.env.SIMULATION_MODE === 'true',

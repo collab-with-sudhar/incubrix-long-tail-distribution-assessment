@@ -91,7 +91,7 @@ export class StorageService {
     if (!fs.existsSync(this.localDir)) return [];
     const files = fs.readdirSync(this.localDir);
     return files
-      .map((filename) => {
+      .map((filename: string) => {
         const filePath = path.join(this.localDir, filename);
         try {
           const stats = fs.statSync(filePath);

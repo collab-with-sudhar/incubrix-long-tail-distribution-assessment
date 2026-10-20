@@ -21,7 +21,7 @@ async function runBatch() {
   const filesToProcess: string[] = [];
 
   if (fs.statSync(inputPath).isDirectory()) {
-    const files = fs.readdirSync(inputPath).filter((f) => f.endsWith('.json'));
+    const files = fs.readdirSync(inputPath).filter((f: string) => f.endsWith('.json'));
     for (const f of files) {
       filesToProcess.push(path.join(inputPath, f));
     }

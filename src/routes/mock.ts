@@ -413,14 +413,17 @@ mockRouter.delete('/discourse/posts/:id.json', (req: Request, res: Response) => 
 
 mockRouter.get(['/discourse/t/:slug/:id', '/discourse/t/:id'], (req: Request, res: Response) => {
   const { slug, id } = req.params;
-  const post = mockPostsStore.get(id) || mockPostsStore.get(slug || '') || mockPostsStore.get(`${slug}-${id}`) || {
+  const post: MockPostRecord = mockPostsStore.get(id) || mockPostsStore.get(slug || '') || mockPostsStore.get(`${slug}-${id}`) || {
     id: id || '1001',
-    title: slug ? slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Discourse Forum Discussion',
+    title: slug ? slug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Discourse Forum Discussion',
     body: 'Automated discussion topic published via IncuBrix Distribution Network. Certified against forum posting rules and frequency limits.',
     platform: 'Discourse Forum',
     createdAt: new Date().toISOString(),
     url: `/mock/discourse/t/${slug || 'topic'}/${id || '1001'}`,
-    status: 'published'
+    status: 'published',
+    tags: ['saas', 'developers', 'community'],
+    score: '4 / 5',
+    media_urls: []
   };
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -519,14 +522,17 @@ mockRouter.delete('/ghost/ghost/api/admin/posts/:id', (req: Request, res: Respon
 
 mockRouter.get(['/ghost/p/:slug', '/ghost/:slug'], (req: Request, res: Response) => {
   const { slug } = req.params;
-  const post = mockPostsStore.get(slug) || mockPostsStore.get(`gh_${slug}`) || mockPostsStore.get(slug.replace(/^gh_/, '')) || {
+  const post: MockPostRecord = mockPostsStore.get(slug) || mockPostsStore.get(`gh_${slug}`) || mockPostsStore.get(slug.replace(/^gh_/, '')) || {
     id: `gh_${slug}`,
-    title: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+    title: slug.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
     body: '<p>This is a live mock publication rendered via IncuBrix Long-Tail Destination Network.</p><p>Reviewers can verify automated publishing, status checks, and lifecycle management end-to-end.</p>',
     platform: 'Ghost Publisher',
     createdAt: new Date().toISOString(),
     url: `/mock/ghost/p/${slug}`,
-    status: 'published'
+    status: 'published',
+    tags: ['creators', 'marketing', 'video'],
+    score: '4 / 5',
+    media_urls: []
   };
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -634,14 +640,17 @@ mockRouter.post('/lemmy/api/v3/post/delete', (req: Request, res: Response) => {
 
 mockRouter.get('/lemmy/post/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const post = mockPostsStore.get(id) || mockPostsStore.get(`lem_${id}`) || {
+  const post: MockPostRecord = mockPostsStore.get(id) || mockPostsStore.get(`lem_${id}`) || {
     id,
     title: 'Lemmy Community Discussion',
     body: 'Automated post submitted via IncuBrix Distribution Network to Lemmy federated community.',
     platform: 'Lemmy Community',
     createdAt: new Date().toISOString(),
     url: `/mock/lemmy/post/${id}`,
-    status: 'published'
+    status: 'published',
+    tags: ['open-source', 'founders', 'ai'],
+    score: '5 / 5',
+    media_urls: []
   };
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -720,14 +729,17 @@ mockRouter.get([
   '/webhook/event/:id'
 ], (req: Request, res: Response) => {
   const { id } = req.params;
-  const post = mockPostsStore.get(id) || mockPostsStore.get(`wh_evt_${id}`) || {
+  const post: MockPostRecord = mockPostsStore.get(id) || mockPostsStore.get(`wh_evt_${id}`) || {
     id,
     title: 'Partner Webhook Event Delivery',
     body: JSON.stringify({ event: 'publication.created', event_id: id, status: 'delivered', signature_valid: true }, null, 2),
     platform: 'Signed Webhook (HMAC)',
     createdAt: new Date().toISOString(),
     url: `/mock/webhook/events/${id}`,
-    status: 'delivered'
+    status: 'delivered',
+    tags: ['saas', 'distribution'],
+    score: '4 / 5',
+    media_urls: []
   };
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -871,14 +883,17 @@ mockRouter.delete('/devto/api/articles/:id', (req: Request, res: Response) => {
  */
 mockRouter.get('/devto/article/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const post = mockPostsStore.get(id) || {
+  const post: MockPostRecord = mockPostsStore.get(id) || {
     id,
     title: 'Developer Publishing Article (Dev.to Simulation)',
     body: '<p>Developer post published via IncuBrix Distribution Network in Simulation/Mock Mode.</p><p>Reviewers can also provide a real <code>DEVTO_API_KEY</code> in <code>.env</code> to publish live articles to dev.to.</p>',
     platform: 'Dev.to Developer Blog',
     createdAt: new Date().toISOString(),
     url: `/mock/devto/article/${id}`,
-    status: 'published'
+    status: 'published',
+    tags: ['developers', 'ai', 'saas'],
+    score: '5 / 5',
+    media_urls: []
   };
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
