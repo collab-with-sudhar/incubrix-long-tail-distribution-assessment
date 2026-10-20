@@ -39,6 +39,15 @@ interface RowReport {
   enriched?: { est_audience?: number };
 }
 
+interface AttachedFile {
+  filename: string;
+  original_name: string;
+  size_bytes: number;
+  mime_type: string;
+  download_url: string;
+  stored_at?: string;
+}
+
 interface ImportSummary {
   total_rows: number;
   imported_count: number;
@@ -50,7 +59,7 @@ interface ImportSummary {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'publish' | 'destinations' | 'rules' | 'import' | 'certification' | 'cleanup'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'destinations' | 'files' | 'rules' | 'import' | 'certification' | 'cleanup'>('publish');
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [healthStatus, setHealthStatus] = useState<string>('Connecting...');
   const [simulationMode, setSimulationMode] = useState<boolean>(true);
@@ -68,6 +77,14 @@ export function App() {
   const [isAiGenerated, setIsAiGenerated] = useState<boolean>(true);
   const [isAsync, setIsAsync] = useState<boolean>(false);
   const [idempKey, setIdempKey] = useState<string>('');
+
+  // Media & File Ingestion State (Integration Standard 7)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [remoteUrlInput, setRemoteUrlInput] = useState<string>('');
+  const [isUploadingFile, setIsUploadingFile] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [storageFiles, setStorageFiles] = useState<AttachedFile[]>([]);
+  const [isLoadingStorage, setIsLoadingStorage] = useState<boolean>(false);
 
   // Publish Output State
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
@@ -248,6 +265,91 @@ export function App() {
     }
   };
 
+  // File Upload & Storage Ingestion Handlers (Integration Standard 7)
+  const fetchStorageFiles = async () => {
+    setIsLoadingStorage(true);
+    try {
+      const res = await fetch('/api/v1/files');
+      if (res.ok) {
+        const data = await res.json();
+        setStorageFiles(data.files || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch storage files:', err);
+    } finally {
+      setIsLoadingStorage(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingFile(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/v1/files/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || 'File upload failed');
+      }
+
+      const stored: AttachedFile = await res.json();
+      setAttachedFiles((prev) => [...prev, stored]);
+      e.target.value = '';
+    } catch (err: any) {
+      setUploadError(err.message || 'File upload failed');
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const handleUrlIngestion = async () => {
+    if (!remoteUrlInput.trim()) return;
+
+    setIsUploadingFile(true);
+    setUploadError(null);
+
+    try {
+      const res = await fetch('/api/v1/files/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: remoteUrlInput.trim() })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || 'URL file ingestion failed');
+      }
+
+      const stored: AttachedFile = await res.json();
+      setAttachedFiles((prev) => [...prev, stored]);
+      setRemoteUrlInput('');
+    } catch (err: any) {
+      setUploadError(err.message || 'Failed to ingest file from URL');
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAttachFromStorage = (file: AttachedFile) => {
+    if (!attachedFiles.some((f) => f.filename === file.filename)) {
+      setAttachedFiles((prev) => [...prev, file]);
+    }
+  };
+
   // Publishing
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,6 +362,7 @@ export function App() {
       title: postTitle,
       body: postBody,
       canonical_url: postCanonical || undefined,
+      media_urls: attachedFiles.map((f) => f.download_url),
       tags: postTags.split(',').map((s) => s.trim()).filter(Boolean),
       is_promotional: isPromotional,
       is_ai_generated: isAiGenerated
@@ -583,6 +686,19 @@ export function App() {
             <span className="counter-badge">{destinations.length}</span>
           </button>
           <button
+            className={`nav-tab-item ${activeTab === 'files' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('files'); fetchStorageFiles(); }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
+            </svg>
+            <span>Storage & Files</span>
+            {attachedFiles.length > 0 && (
+              <span className="counter-badge">{attachedFiles.length}</span>
+            )}
+          </button>
+          <button
             className={`nav-tab-item ${activeTab === 'rules' ? 'active' : ''}`}
             onClick={() => { setActiveTab('rules'); if (!tailorResult) handleTailorAndScore(); }}
           >
@@ -731,6 +847,162 @@ export function App() {
                         onChange={(e) => handleContentChange(() => setPostTags(e.target.value))}
                       />
                     </div>
+                  </div>
+
+                  {/* Media Files & Storage Ingestion (Integration Standard 7: Files In, Files Out) */}
+                  <div className="field-container" style={{ marginTop: '14px', background: '#F8FAF9', padding: '16px', borderRadius: '10px', border: '1px solid #D2DFD5' }}>
+                    <div className="field-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="field-label" style={{ fontWeight: 600, color: '#1B492F', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                        Media Assets & File Upload (Integration Standard 7)
+                      </label>
+                      <span style={{ fontSize: '11px', color: '#7A8B7F', fontFamily: 'monospace' }}>
+                        S3 / Storage Compatible
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '12px', color: '#4F5E53', margin: '0 0 12px 0' }}>
+                      Attach images or files to syndication. Inputs accepted as an upload or URL. Stored to storage and returned as download links.
+                    </p>
+
+                    {/* Dual Input Controls: File Picker + URL Ingest */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 14px',
+                          background: '#FFFFFF',
+                          border: '1px solid #245E3D',
+                          borderRadius: '6px',
+                          color: '#245E3D',
+                          fontSize: '12.5px',
+                          fontWeight: 500,
+                          cursor: isUploadingFile ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="17 8 12 3 7 8"></polyline>
+                          <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        {isUploadingFile ? 'Uploading...' : '📁 Choose File to Upload'}
+                        <input
+                          type="file"
+                          style={{ display: 'none' }}
+                          onChange={handleFileUpload}
+                          disabled={isUploadingFile}
+                        />
+                      </label>
+
+                      <div style={{ display: 'flex', gap: '6px', flex: 1, minWidth: '220px' }}>
+                        <input
+                          type="url"
+                          className="text-input"
+                          placeholder="Or paste asset URL (e.g. https://...)"
+                          value={remoteUrlInput}
+                          onChange={(e) => setRemoteUrlInput(e.target.value)}
+                          style={{ fontSize: '12px', padding: '6px 10px', height: '34px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUrlIngestion}
+                          disabled={isUploadingFile || !remoteUrlInput.trim()}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#245E3D',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: isUploadingFile || !remoteUrlInput.trim() ? 'not-allowed' : 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          📥 Ingest URL
+                        </button>
+                      </div>
+                    </div>
+
+                    {uploadError && (
+                      <div style={{ marginTop: '8px', padding: '6px 10px', background: '#FDF1F0', border: '1px solid #F4C4C2', borderRadius: '6px', color: '#8A2525', fontSize: '12px' }}>
+                        ⚠️ {uploadError}
+                      </div>
+                    )}
+
+                    {/* Attached Files List */}
+                    {attachedFiles.length > 0 && (
+                      <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#141C16', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Attached Assets ({attachedFiles.length})
+                        </span>
+                        {attachedFiles.map((file, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: '#FFFFFF',
+                              border: '1px solid #C1DEC9',
+                              borderRadius: '6px',
+                              padding: '8px 12px',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              <span style={{ fontSize: '14px' }}>📎</span>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: 500, color: '#141C16', wordBreak: 'break-all' }}>
+                                  {file.original_name}
+                                </span>
+                                <span style={{ fontSize: '11px', color: '#7A8B7F', fontFamily: 'monospace' }}>
+                                  {(file.size_bytes / 1024).toFixed(1)} KB • {file.mime_type}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <a
+                                href={file.download_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  color: '#245E3D',
+                                  textDecoration: 'none',
+                                  fontWeight: 500,
+                                  fontSize: '11.5px',
+                                  padding: '3px 8px',
+                                  background: '#EBF4EE',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                ⬇️ Download Link
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(idx)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#8A2525',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  padding: '2px 4px'
+                                }}
+                                title="Remove attachment"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Segmented Switches */}
@@ -885,6 +1157,25 @@ export function App() {
                         </a>
                       </span>
                     </div>
+
+                    {attachedFiles.length > 0 && (
+                      <div className="kv-row" style={{ alignItems: 'flex-start' }}>
+                        <span className="kv-key">Media Assets</span>
+                        <div className="kv-value" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {attachedFiles.map((f, i) => (
+                            <a
+                              key={i}
+                              href={f.download_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--green-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                            >
+                              📎 {f.original_name} ({(f.size_bytes / 1024).toFixed(1)} KB) ⬇️ Download
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="kv-row">
                       <span className="kv-key">Idempotency Status</span>
                       <span className="kv-value" style={{ fontWeight: 600, color: cacheStatus === 'HIT' ? '#1e8e3e' : '#1a73e8' }}>
@@ -1129,6 +1420,163 @@ export function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: STORAGE & FILES (Integration Standard 7: Files in, files out) */}
+        {activeTab === 'files' && (
+          <div className="layout-split">
+            {/* Left: Upload & Ingest Sandbox */}
+            <div className="panel-card">
+              <div className="panel-card-header">
+                <div>
+                  <h2 className="panel-title">Asset Ingestion Sandbox</h2>
+                  <p className="panel-subtitle">Integration Standard 7: Files in, files out (Upload & URL Ingestion)</p>
+                </div>
+              </div>
+
+              <div className="field-container">
+                <label className="field-label">1. Upload Local File</label>
+                <p style={{ fontSize: '12px', color: '#4F5E53', marginBottom: '10px' }}>
+                  Upload any media, image, or document. The file is saved to S3-compatible storage and returned as a permanent download link.
+                </p>
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 18px',
+                    background: '#245E3D',
+                    color: '#FFFFFF',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: isUploadingFile ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  {isUploadingFile ? 'Uploading to Storage...' : '📁 Choose File to Upload'}
+                  <input
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      await handleFileUpload(e);
+                      fetchStorageFiles();
+                    }}
+                    disabled={isUploadingFile}
+                  />
+                </label>
+              </div>
+
+              <div className="field-container" style={{ marginTop: '24px' }}>
+                <label className="field-label">2. Ingest Asset from Remote URL</label>
+                <p style={{ fontSize: '12px', color: '#4F5E53', marginBottom: '10px' }}>
+                  Provide a remote asset URL to download, persist into storage, and generate a storage download link.
+                </p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="url"
+                    className="text-input"
+                    placeholder="https://example.com/asset.png or http://localhost:3000/health"
+                    value={remoteUrlInput}
+                    onChange={(e) => setRemoteUrlInput(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="action-btn primary small"
+                    onClick={async () => {
+                      await handleUrlIngestion();
+                      fetchStorageFiles();
+                    }}
+                    disabled={isUploadingFile || !remoteUrlInput.trim()}
+                  >
+                    📥 Ingest URL
+                  </button>
+                </div>
+              </div>
+
+              {uploadError && (
+                <div className="advisory-notice blocked" style={{ marginTop: '16px' }}>
+                  <span>⚠️ {uploadError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Storage Vault List */}
+            <div className="panel-card">
+              <div className="panel-card-header">
+                <div>
+                  <h2 className="panel-title">Storage Vault ({storageFiles.length})</h2>
+                  <p className="panel-subtitle">Stored assets and download links</p>
+                </div>
+                <button
+                  className="action-btn outline small"
+                  onClick={fetchStorageFiles}
+                  disabled={isLoadingStorage}
+                >
+                  {isLoadingStorage ? 'Refreshing...' : '↻ Refresh'}
+                </button>
+              </div>
+
+              {storageFiles.length === 0 ? (
+                <div style={{ padding: '36px', textAlign: 'center', color: '#7A8B7F' }}>
+                  No stored assets found in storage directory. Upload a file or ingest a URL to test.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {storageFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '12px 14px',
+                        background: '#FFFFFF',
+                        border: '1px solid #E1EAE3',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '18px' }}>📦</span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 600, color: '#141C16', wordBreak: 'break-all' }}>
+                            {file.filename}
+                          </span>
+                          <span style={{ fontSize: '11.5px', color: '#7A8B7F', fontFamily: 'monospace' }}>
+                            {(file.size_bytes / 1024).toFixed(1)} KB • {file.stored_at ? new Date(file.stored_at).toLocaleTimeString() : 'Stored'}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <a
+                          href={file.download_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="action-btn outline small"
+                          style={{ textDecoration: 'none', color: '#245E3D' }}
+                        >
+                          ⬇️ Download
+                        </a>
+                        <button
+                          className="action-btn primary small"
+                          onClick={() => {
+                            handleAttachFromStorage(file);
+                            setActiveTab('publish');
+                          }}
+                        >
+                          + Attach to Post
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

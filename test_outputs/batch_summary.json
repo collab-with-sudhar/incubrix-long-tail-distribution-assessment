@@ -1,0 +1,38 @@
+{
+  "total": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "results": [
+    {
+      "file": "01_discourse_discussion.json",
+      "status": "succeeded",
+      "output_file": "01_discourse_discussion_result.json"
+    },
+    {
+      "file": "02_devto_technical_post.json",
+      "status": "succeeded",
+      "output_file": "02_devto_technical_post_result.json"
+    },
+    {
+      "file": "03_rule_violation_promo.json",
+      "status": "failed",
+      "error": {
+        "error": {
+          "code": "PLATFORM_CONTENT_REJECTED",
+          "message": "Self-promotion is strictly prohibited in Discourse Meta Community",
+          "retryable": false,
+          "details": {
+            "violations": [
+              {
+                "field": "is_promotional",
+                "code": "PLATFORM_CONTENT_REJECTED",
+                "message": "Self-promotion is strictly prohibited in Discourse Meta Community"
+              }
+            ]
+          }
+        }
+      },
+      "output_file": "03_rule_violation_promo_result.json"
+    }
+  ]
+}

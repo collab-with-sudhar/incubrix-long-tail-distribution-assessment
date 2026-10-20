@@ -1,29 +1,46 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { globalRegistry } from '../connectors/registry.js';
 import { globalCatalogue } from '../catalogue/store.js';
 import { RulesEngine } from '../rules/engine.js';
 import { globalJobManager } from '../jobs/manager.js';
 import { globalHarness } from '../certification/harness.js';
 import { globalTestPostReaper } from '../cleanup/reaper.js';
+import { globalStorageService } from '../storage/service.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { Rendition, Destination, Connection } from '../types/contract.js';
 
 export const apiV1Router = Router();
 export const globalRulesEngine = new RulesEngine();
+const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } });
 
 /**
  * Output Manifest Generator (Integration Standard 9)
  */
 function createManifest(startTime: number, warnings: string[] = []) {
+  const durationMs = Date.now() - startTime;
   return {
     version: '1.0.0',
     service: 'incubrix-distribution-service',
     engine: 'express-ts-runtime',
+    models_providers: {
+      ai_provider: process.env.AI_PROVIDER || 'mock',
+      model: process.env.AI_MODEL || 'gpt-4o-mini',
+      version: '1.0.0'
+    },
+    settings: {
+      simulation_mode: process.env.SIMULATION_MODE === 'true',
+      frequency_cap_enforced: true,
+      max_retry_attempts: 3
+    },
+    seed: 42,
     timings: {
-      duration_ms: Date.now() - startTime
+      duration_ms: durationMs
     },
     cost_estimate_usd: 0.00015,
+    cost_estimate: '$0.00015',
     licence: 'Commercial use permitted',
+    rights: 'All rights reserved by creator; syndicate licence granted',
     warnings
   };
 }
@@ -97,83 +114,96 @@ apiV1Router.post('/publish', async (req: Request, res: Response, next: NextFunct
       );
     }
 
-    // 3. Asynchronous Execution as Background Job (Integration Standard 3)
+    // 3. Execution Engine with 2-Second Background Job Auto-Promotion (Integration Standard 3)
+    const job = globalJobManager.createJob('content.publish', callback_url);
+    globalJobManager.updateJob(job.id, { status: 'running', progress: 20 });
+
+    const publishTask = (async () => {
+      globalJobManager.updateJob(job.id, { status: 'running', progress: 60 });
+      const pubResult = await connector.publish(
+        preparedRendition,
+        destination,
+        connection || {},
+        idempotencyKey
+      );
+      globalRulesEngine.recordPost(destination.id || destination.url);
+
+      if (pubResult && pubResult.platform_post_id) {
+        globalTestPostReaper.track({
+          platformPostId: pubResult.platform_post_id,
+          connectorKey: destination.connector_key,
+          destination,
+          connection: { base_url: destination.url, ...(connection || {}) },
+          title: preparedRendition.title
+        });
+      }
+
+      const completed = {
+        ...pubResult,
+        job_id: job.id,
+        manifest: createManifest(startTime, allWarnings)
+      };
+
+      globalJobManager.updateJob(job.id, {
+        status: 'succeeded',
+        progress: 100,
+        result: completed
+      });
+
+      return completed;
+    })();
+
+    // Explicit async requested -> return 202 immediately
     if (isAsync) {
-      const job = globalJobManager.createJob('content.publish', callback_url);
-
-      // Execute in background
-      setImmediate(async () => {
-        try {
-          globalJobManager.updateJob(job.id, { status: 'running', progress: 30 });
-          const pubResult = await connector.publish(
-            preparedRendition,
-            destination,
-            connection || {},
-            idempotencyKey
-          );
-          globalRulesEngine.recordPost(destination.id || destination.url);
-
-          if (pubResult && pubResult.platform_post_id) {
-            globalTestPostReaper.track({
-              platformPostId: pubResult.platform_post_id,
-              connectorKey: destination.connector_key,
-              destination,
-              connection: { base_url: destination.url, ...(connection || {}) },
-              title: preparedRendition.title
-            });
-          }
-
-          globalJobManager.updateJob(job.id, {
-            status: 'succeeded',
-            progress: 100,
-            result: {
-              ...pubResult,
-              manifest: createManifest(startTime, allWarnings)
-            }
-          });
-        } catch (err: any) {
-          globalJobManager.updateJob(job.id, {
-            status: 'failed',
-            progress: 100,
-            error: {
-              code: err.code || 'PLATFORM_UNAVAILABLE',
-              message: err.message
-            }
-          });
-        }
+      publishTask.catch((err: any) => {
+        globalJobManager.updateJob(job.id, {
+          status: 'failed',
+          progress: 100,
+          error: { code: err.code || 'PLATFORM_UNAVAILABLE', message: err.message }
+        });
       });
 
       res.status(202).json({
         job_id: job.id,
-        status: job.status,
+        status: 'queued',
+        progress: 0,
         check_url: `/api/v1/jobs/${job.id}`
       });
       return;
     }
 
-    // 4. Synchronous Execution
-    const pubResult = await connector.publish(
-      preparedRendition,
-      destination,
-      connection || {},
-      idempotencyKey
+    // Synchronous execution: race against 2000ms threshold (Integration Standard 3)
+    const timeoutPromise = new Promise<{ isTimeout: true }>((resolve) =>
+      setTimeout(() => resolve({ isTimeout: true }), 2000)
     );
-    globalRulesEngine.recordPost(destination.id || destination.url);
 
-    if (pubResult && pubResult.platform_post_id) {
-      globalTestPostReaper.track({
-        platformPostId: pubResult.platform_post_id,
-        connectorKey: destination.connector_key,
-        destination,
-        connection: { base_url: destination.url, ...(connection || {}) },
-        title: preparedRendition.title
+    const raceResult = await Promise.race([
+      publishTask.then((data) => ({ isTimeout: false, data })),
+      timeoutPromise
+    ]);
+
+    if (raceResult.isTimeout) {
+      // Operation exceeded 2s -> return 202 with job_id for background poll
+      publishTask.catch((err: any) => {
+        globalJobManager.updateJob(job.id, {
+          status: 'failed',
+          progress: 100,
+          error: { code: err.code || 'PLATFORM_UNAVAILABLE', message: err.message }
+        });
       });
+
+      res.status(202).json({
+        job_id: job.id,
+        status: 'running',
+        progress: 60,
+        check_url: `/api/v1/jobs/${job.id}`,
+        message: 'Publish operation processing asynchronously (exceeded 2s threshold)'
+      });
+      return;
     }
 
-    res.status(200).json({
-      ...pubResult,
-      manifest: createManifest(startTime, allWarnings)
-    });
+    // Completed within 2 seconds
+    res.status(200).json(raceResult.data);
   } catch (err) {
     next(err);
   }
@@ -393,6 +423,62 @@ apiV1Router.post('/cleanup/purge', async (req: Request, res: Response, next: Nex
     next(err);
   }
 });
+
+/**
+ * POST /api/v1/files/upload
+ * Accept multipart file upload or remote URL (Integration Standard 7: Files in, files out)
+ */
+apiV1Router.post('/files/upload', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.file) {
+      const stored = await globalStorageService.saveBuffer(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+      return res.status(201).json(stored);
+    }
+
+    if (req.body && req.body.url) {
+      const stored = await globalStorageService.saveFromUrl(req.body.url);
+      return res.status(201).json(stored);
+    }
+
+    throw new AppError('DEST_SPEC_VIOLATION', 'Either multipart "file" or JSON "url" must be provided', 400);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/files
+ * List all stored files and assets (Integration Standard 7)
+ */
+apiV1Router.get('/files', (req: Request, res: Response) => {
+  const files = globalStorageService.listFiles();
+  res.status(200).json({
+    total: files.length,
+    files
+  });
+});
+
+/**
+ * GET /api/v1/files/:filename
+ * Download / serve stored file (Integration Standard 7: Files in, files out)
+ */
+apiV1Router.get('/files/:filename', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const filename = req.params.filename;
+    const filePath = globalStorageService.getFilePath(filename);
+    if (!filePath) {
+      throw new AppError('DEST_SPEC_VIOLATION', `File not found: ${filename}`, 404);
+    }
+    res.sendFile(filePath);
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 
 

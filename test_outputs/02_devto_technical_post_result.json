@@ -1,0 +1,32 @@
+{
+  "platform_post_id": "234286",
+  "live_url": "http://localhost:3000/mock/devto/article/234286",
+  "status": "published",
+  "job_id": "60a2bb17-ad95-4961-adb3-b23c1e9b0a76",
+  "manifest": {
+    "version": "1.0.0",
+    "service": "incubrix-distribution-service",
+    "engine": "express-ts-runtime",
+    "models_providers": {
+      "ai_provider": "mock",
+      "model": "gpt-4o-mini",
+      "version": "1.0.0"
+    },
+    "settings": {
+      "simulation_mode": true,
+      "frequency_cap_enforced": true,
+      "max_retry_attempts": 3
+    },
+    "seed": 42,
+    "timings": {
+      "duration_ms": 8
+    },
+    "cost_estimate_usd": 0.00015,
+    "cost_estimate": "$0.00015",
+    "licence": "Commercial use permitted",
+    "rights": "All rights reserved by creator; syndicate licence granted",
+    "warnings": [
+      "AI disclosure statement automatically appended to satisfy destination policy"
+    ]
+  }
+}

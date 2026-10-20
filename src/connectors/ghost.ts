@@ -87,7 +87,8 @@ export class GhostConnector extends BaseConnector {
               title: rendition.title || 'IncuBrix Publication',
               html: rendition.body,
               status: 'published',
-              canonical_url: rendition.canonical_url
+              canonical_url: rendition.canonical_url,
+              feature_image: (rendition.media_urls && rendition.media_urls[0]) || undefined
             }
           ]
         },

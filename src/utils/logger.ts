@@ -41,12 +41,16 @@ export function maskSecrets(obj: any): any {
 
 export class Logger {
   public static log(level: LogLevel, message: string, meta: Record<string, any> = {}) {
+    const correlationId = meta.correlation_id || meta.correlationId || meta['X-Correlation-Id'] || undefined;
+    const jobId = meta.job_id || meta.jobId || undefined;
+
     const entry = {
       timestamp: new Date().toISOString(),
       level,
       message,
-      correlation_id: meta.correlation_id || meta.correlationId || undefined,
-      job_id: meta.job_id || meta.jobId || undefined,
+      correlation_id: correlationId,
+      'X-Correlation-Id': correlationId,
+      job_id: jobId,
       ...maskSecrets(meta)
     };
     // Print structured JSON

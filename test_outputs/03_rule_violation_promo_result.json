@@ -1,0 +1,16 @@
+{
+  "error": {
+    "code": "PLATFORM_CONTENT_REJECTED",
+    "message": "Self-promotion is strictly prohibited in Discourse Meta Community",
+    "retryable": false,
+    "details": {
+      "violations": [
+        {
+          "field": "is_promotional",
+          "code": "PLATFORM_CONTENT_REJECTED",
+          "message": "Self-promotion is strictly prohibited in Discourse Meta Community"
+        }
+      ]
+    }
+  }
+}

@@ -56,6 +56,7 @@ export class DevtoConnector extends BaseConnector {
             body_markdown: rendition.body || 'Published via IncuBrix Distribution Network.',
             published: true,
             tags: cleanTags,
+            main_image: (rendition.media_urls && rendition.media_urls[0]) || undefined,
             canonical_url: rendition.canonical_url || undefined
           }
         },

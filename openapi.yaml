@@ -206,6 +206,171 @@ paths:
         '201':
           description: Destination created
 
+  /api/v1/files/upload:
+    post:
+      summary: Upload an input media asset file or ingest from remote URL (Integration Standard 7)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+      responses:
+        '201':
+          description: File stored successfully with download URL
+
+  /api/v1/files/{filename}:
+    get:
+      summary: Download a stored media file or asset
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stored file stream
+
+  /api/v1/cleanup/posts:
+    get:
+      summary: List all active test posts tracked for automatic 10-minute deletion (Must-Have 5)
+      responses:
+        '200':
+          description: Active tracked test posts list
+
+  /api/v1/cleanup/purge:
+    post:
+      summary: On-demand immediate purge of all tracked test posts across all connectors (Must-Have 5)
+      responses:
+        '200':
+          description: All test posts purged successfully
+
+  /api/v1/catalogue/import:
+    post:
+      summary: Import destinations CSV with validation, de-dup, and enrichment (Advanced Benchmark)
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: object
+              properties:
+                csv_data:
+                  type: string
+      responses:
+        '200':
+          description: CSV import results and benchmark statistics
+
+  /api/v1/rules/capture:
+    post:
+      summary: AI Posting Rules Capture from Community Text (Advanced)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - community_name
+                - guideline_text
+              properties:
+                community_name:
+                  type: string
+                guideline_text:
+                  type: string
+      responses:
+        '200':
+          description: Proposed rules requiring human confirmation
+
+  /api/v1/rules/confirm:
+    post:
+      summary: Human confirmation of proposed AI rules before activation (Advanced)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proposal_id
+                - approved
+              properties:
+                proposal_id:
+                  type: string
+                approved:
+                  type: boolean
+      responses:
+        '200':
+          description: Confirmation result
+
+  /api/v1/catalogue/score-relevance:
+    post:
+      summary: Score destination relevance 1 to 5 with explanation (Advanced)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - destination
+              properties:
+                destination:
+                  type: object
+      responses:
+        '200':
+          description: Relevance score and reasoning
+
+  /api/v1/content/tailor:
+    post:
+      summary: Tailor content rendition to destination surface and audience constraints (Advanced)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rendition
+                - destination
+              properties:
+                rendition:
+                  type: object
+                destination:
+                  type: object
+      responses:
+        '200':
+          description: Tailored rendition payload
+
+  /api/v1/certification/run:
+    post:
+      summary: Run connector certification harness and record proof files (Must-Have 3)
+      responses:
+        '200':
+          description: Full connector certification results
+
+  /api/v1/certification/evidence:
+    get:
+      summary: Retrieve all saved connector certification evidence files
+      responses:
+        '200':
+          description: Array of connector certification evidence JSON
+
   /connector/v1/{connector_key}/{method}:
     post:
       summary: Appendix A connector contract invoke method
